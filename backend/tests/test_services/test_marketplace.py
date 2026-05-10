@@ -5,11 +5,13 @@ import pytest
 import respx
 
 from app.core.exceptions import MarketplaceAPIError
-from app.models.marketplace import SearchResponse
+from app.models.marketplace import BatchResponse, SearchResponse
 from app.services.marketplace import MarketplaceService
 
 BASE_URL = "https://marketplace.dify.ai"
 SEARCH_URL = f"{BASE_URL}/api/v1/plugins/search/basic"
+BATCH_URL = f"{BASE_URL}/api/v1/plugins/batch"
+DOWNLOAD_URL = f"{BASE_URL}/api/v1/plugins/langgenius/agent/0.0.1/download"
 
 
 @pytest.fixture
@@ -138,3 +140,131 @@ class TestSearchPlugins:
             await service.search_plugins(keyword="agent", category="", page=1, page_size=20)
 
         assert "Marketplace API 返回错误" in exc_info.value.message
+
+
+class TestBatchGetPlugins:
+    @respx.mock
+    async def test_batch_returns_batch_response(self, service):
+        mock_response = {
+            "code": 0,
+            "data": {
+                "plugins": [
+                    {
+                        "type": "plugin",
+                        "name": "agent",
+                        "org": "langgenius",
+                        "plugin_id": "langgenius/agent",
+                        "label": {"en_US": "Agent", "zh_Hans": "智能体"},
+                    },
+                    {
+                        "type": "plugin",
+                        "name": "chat",
+                        "org": "langgenius",
+                        "plugin_id": "langgenius/chat",
+                        "label": {"en_US": "Chat"},
+                    },
+                ]
+            },
+        }
+        respx.post(BATCH_URL).mock(return_value=httpx.Response(200, json=mock_response))
+
+        result = await service.batch_get_plugins(plugin_ids=["langgenius/agent", "langgenius/chat"])
+
+        assert isinstance(result, BatchResponse)
+        assert len(result.plugins) == 2
+        assert result.plugins[0].name == "agent"
+        assert result.plugins[1].name == "chat"
+
+    @respx.mock
+    async def test_batch_sends_correct_request_body(self, service):
+        route = respx.post(BATCH_URL).mock(return_value=httpx.Response(200, json={"code": 0, "data": {"plugins": []}}))
+
+        await service.batch_get_plugins(plugin_ids=["langgenius/agent", "langgenius/chat"])
+
+        assert route.called
+        request = route.calls.last.request
+        body = json.loads(request.content)
+        assert body["plugin_ids"] == ["langgenius/agent", "langgenius/chat"]
+
+    @respx.mock
+    async def test_batch_empty_ids_returns_empty_list(self, service):
+        mock_response = {"code": 0, "data": {"plugins": []}}
+        respx.post(BATCH_URL).mock(return_value=httpx.Response(200, json=mock_response))
+
+        result = await service.batch_get_plugins(plugin_ids=[])
+
+        assert isinstance(result, BatchResponse)
+        assert result.plugins == []
+
+    @respx.mock
+    async def test_batch_timeout_raises_marketplace_api_error(self, service):
+        respx.post(BATCH_URL).mock(side_effect=httpx.ConnectTimeout("timed out"))
+
+        with pytest.raises(MarketplaceAPIError) as exc_info:
+            await service.batch_get_plugins(plugin_ids=["langgenius/agent"])
+
+        assert "无法连接到 Marketplace API" in exc_info.value.message
+        assert exc_info.value.status_code == 503
+
+    @respx.mock
+    async def test_batch_5xx_raises_marketplace_api_error(self, service):
+        respx.post(BATCH_URL).mock(return_value=httpx.Response(500, json={"code": 1, "msg": "Internal Error"}))
+
+        with pytest.raises(MarketplaceAPIError) as exc_info:
+            await service.batch_get_plugins(plugin_ids=["langgenius/agent"])
+
+        assert "无法连接到 Marketplace API" in exc_info.value.message
+        assert exc_info.value.status_code == 503
+
+    @respx.mock
+    async def test_batch_api_returns_error_code(self, service):
+        mock_response = {"code": 1, "msg": "参数错误"}
+        respx.post(BATCH_URL).mock(return_value=httpx.Response(200, json=mock_response))
+
+        with pytest.raises(MarketplaceAPIError) as exc_info:
+            await service.batch_get_plugins(plugin_ids=["langgenius/agent"])
+
+        assert exc_info.value.message == "参数错误"
+
+
+class TestDownloadPlugin:
+    @respx.mock
+    async def test_download_returns_httpx_response(self, service):
+        binary_content = b"fake-plugin-package-content"
+        respx.get(DOWNLOAD_URL).mock(return_value=httpx.Response(200, content=binary_content))
+
+        result = await service.download_plugin(author="langgenius", name="agent", version="0.0.1")
+
+        assert isinstance(result, httpx.Response)
+        assert result.content == binary_content
+
+    @respx.mock
+    async def test_download_404_raises_not_found_error(self, service):
+        respx.get(DOWNLOAD_URL).mock(return_value=httpx.Response(404, json={"code": 1, "msg": "not found"}))
+
+        with pytest.raises(MarketplaceAPIError) as exc_info:
+            await service.download_plugin(author="langgenius", name="agent", version="0.0.1")
+
+        assert exc_info.value.code == "NOT_FOUND"
+        assert exc_info.value.status_code == 404
+        assert "未找到该插件" in exc_info.value.message
+
+    @respx.mock
+    async def test_download_timeout_raises_marketplace_api_error(self, service):
+        respx.get(DOWNLOAD_URL).mock(side_effect=httpx.ConnectTimeout("timed out"))
+
+        with pytest.raises(MarketplaceAPIError) as exc_info:
+            await service.download_plugin(author="langgenius", name="agent", version="0.0.1")
+
+        assert "无法连接到 Marketplace API" in exc_info.value.message
+        assert exc_info.value.status_code == 503
+
+    @respx.mock
+    async def test_download_5xx_raises_marketplace_api_error(self, service):
+        respx.get(DOWNLOAD_URL).mock(return_value=httpx.Response(500, json={"code": 1, "msg": "Internal Error"}))
+
+        with pytest.raises(MarketplaceAPIError) as exc_info:
+            await service.download_plugin(author="langgenius", name="agent", version="0.0.1")
+
+        assert "无法连接到 Marketplace API" in exc_info.value.message
+        assert exc_info.value.status_code == 503
