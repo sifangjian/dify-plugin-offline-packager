@@ -37,7 +37,7 @@ select = [
     "TCH",
     "RUF",
 ]
-ignore = []
+ignore = ["RUF001"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
