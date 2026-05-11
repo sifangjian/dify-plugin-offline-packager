@@ -55,3 +55,4 @@ workspace/
 # Dev process files
 specs/
 docs/
+.trae/
