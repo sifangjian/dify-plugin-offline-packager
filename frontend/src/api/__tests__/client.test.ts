@@ -68,6 +68,29 @@ describe("apiClient", () => {
       })
     })
 
+    it("should return not found message for 404 without error field", async () => {
+      const error: Partial<AxiosError> = {
+        response: {
+          data: {},
+          status: 404,
+          statusText: "Not Found",
+          headers: {},
+          config: {} as InternalAxiosRequestConfig,
+        },
+        isAxiosError: true,
+        name: "AxiosError",
+        message: "Request failed with status code 404",
+      }
+
+      const interceptor = apiClient.interceptors.response.handlers![0]!
+      const rejected = interceptor.rejected
+
+      await expect(rejected!(error)).rejects.toEqual({
+        status: 404,
+        message: "未找到该资源",
+      })
+    })
+
     it("should return rate limit message for 429", async () => {
       const error: Partial<AxiosError> = {
         response: {

@@ -22,6 +22,8 @@ apiClient.interceptors.response.use(
         apiError.message = "请求过于频繁，请稍后重试"
       } else if (error.response.status >= 500) {
         apiError.message = "服务异常，请稍后重试"
+      } else if (error.response.status === 404) {
+        apiError.message = "未找到该资源"
       }
     } else if (error.code === "ECONNABORTED") {
       apiError.message = "网络请求超时"
