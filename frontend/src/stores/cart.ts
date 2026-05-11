@@ -1,45 +1,75 @@
 import { defineStore } from "pinia"
 import { ref, computed } from "vue"
 import type { Plugin } from "@/types/marketplace"
-import type { CartItem } from "@/types/cart"
+
+const CART_STORAGE_KEY = "dify-plugin-cart"
+
+function saveToStorage(items: Plugin[]): void {
+  sessionStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items))
+}
+
+function loadFromStorage(): Plugin[] {
+  const data = sessionStorage.getItem(CART_STORAGE_KEY)
+  if (!data) return []
+  try {
+    return JSON.parse(data) as Plugin[]
+  } catch {
+    return []
+  }
+}
 
 export const useCartStore = defineStore("cart", () => {
-  const items = ref<CartItem[]>([])
+  const items = ref<Plugin[]>(loadFromStorage())
+  const isOpen = ref(false)
 
-  const count = computed(() => items.value.length)
-
-  function addItem(plugin: Plugin) {
-    if (hasItem(plugin.plugin_id)) return
-    items.value.push({
-      pluginId: plugin.plugin_id,
-      name: plugin.name,
-      org: plugin.org,
-      latestVersion: plugin.latest_version,
-      source: "marketplace",
-    })
-  }
+  const itemCount = computed(() => items.value.length)
+  const isEmpty = computed(() => items.value.length === 0)
 
   function hasItem(pluginId: string): boolean {
-    return items.value.some((item) => item.pluginId === pluginId)
+    return items.value.some((item) => item.plugin_id === pluginId)
   }
 
-  function removeItem(pluginId: string) {
-    const index = items.value.findIndex((item) => item.pluginId === pluginId)
-    if (index !== -1) {
-      items.value.splice(index, 1)
-    }
+  function addItem(plugin: Plugin): void {
+    if (hasItem(plugin.plugin_id)) return
+    items.value.push(plugin)
+    saveToStorage(items.value)
   }
 
-  function clearAll() {
+  function removeItem(pluginId: string): void {
+    const index = items.value.findIndex((item) => item.plugin_id === pluginId)
+    if (index === -1) return
+    items.value.splice(index, 1)
+    saveToStorage(items.value)
+  }
+
+  function clearAll(): void {
     items.value = []
+    saveToStorage(items.value)
+  }
+
+  function openSidebar(): void {
+    isOpen.value = true
+  }
+
+  function closeSidebar(): void {
+    isOpen.value = false
+  }
+
+  function toggleSidebar(): void {
+    isOpen.value = !isOpen.value
   }
 
   return {
     items,
-    count,
-    addItem,
+    isOpen,
+    itemCount,
+    isEmpty,
     hasItem,
+    addItem,
     removeItem,
     clearAll,
+    openSidebar,
+    closeSidebar,
+    toggleSidebar,
   }
 })

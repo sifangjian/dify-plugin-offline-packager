@@ -139,4 +139,22 @@ describe("PluginCard", () => {
     const cartStore = useCartStore()
     expect(cartStore.hasItem(plugin.plugin_id)).toBe(true)
   })
+
+  it("should restore add button after removing plugin from cart", async () => {
+    const plugin = createMockPlugin()
+    const wrapper = mount(PluginCard, { props: { plugin } })
+    const btn = wrapper.find("button")
+    await btn.trigger("click")
+
+    const { useCartStore } = await import("@/stores/cart")
+    const cartStore = useCartStore()
+    cartStore.removeItem(plugin.plugin_id)
+    await wrapper.vm.$nextTick()
+
+    const wrapper2 = mount(PluginCard, { props: { plugin } })
+    const btn2 = wrapper2.find("button")
+    expect(btn2.text()).toBe("添加")
+    expect(btn2.classes()).toContain("bg-blue-500")
+    expect(btn2.attributes("disabled")).toBeUndefined()
+  })
 })
