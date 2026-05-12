@@ -38,6 +38,17 @@ async def pack_plugins(
     return PackResponse(session_id=session.session_id, tasks=tasks)
 
 
+@router.post("/cancel/{session_id}")
+async def cancel_session(
+    session_id: str,
+    packager: PackagerService = _PACKAGER_DEP,
+):
+    result = await packager.cancel_session(session_id)
+    if not result:
+        raise PackageError("未找到该打包会话", code="NOT_FOUND", status_code=404)
+    return {"message": "已取消"}
+
+
 @router.get("/download/{task_id}")
 async def download_plugin(
     task_id: str,

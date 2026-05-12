@@ -398,11 +398,11 @@ class PackagerService:
         if not session:
             return
         tasks = [self._tasks[tid] for tid in session.task_ids]
-        all_done = all(t.status in (TaskStatus.SUCCESS, TaskStatus.FAILED) for t in tasks)
+        all_done = all(t.status in (TaskStatus.SUCCESS, TaskStatus.FAILED, TaskStatus.CANCELLED) for t in tasks)
         if all_done:
             session.status = SessionStatus.COMPLETED
             success_count = sum(1 for t in tasks if t.status == TaskStatus.SUCCESS)
-            failed_count = sum(1 for t in tasks if t.status == TaskStatus.FAILED)
+            failed_count = sum(1 for t in tasks if t.status in (TaskStatus.FAILED, TaskStatus.CANCELLED))
             self._emit_event(
                 SessionCompletedEvent(
                     session_id=session_id,
@@ -431,3 +431,31 @@ class PackagerService:
 
     def get_task(self, task_id: str) -> PackTaskInfo | None:
         return self._tasks.get(task_id)
+
+    async def cancel_session(self, session_id: str) -> bool:
+        session = self._sessions.get(session_id)
+        if not session:
+            return False
+
+        for task_id in session.task_ids:
+            task = self._tasks.get(task_id)
+            if task and task.status in (TaskStatus.PENDING, TaskStatus.RUNNING):
+                task.status = TaskStatus.CANCELLED
+                task.updated_at = datetime.now()
+
+        session.status = SessionStatus.COMPLETED
+        self._emit_event(
+            SessionCompletedEvent(
+                session_id=session_id,
+                success_count=sum(
+                    1 for tid in session.task_ids if self._tasks[tid].status == TaskStatus.SUCCESS
+                ),
+                failed_count=sum(
+                    1
+                    for tid in session.task_ids
+                    if self._tasks[tid].status in (TaskStatus.FAILED, TaskStatus.CANCELLED)
+                ),
+                timestamp=datetime.now(),
+            )
+        )
+        return True

@@ -38,8 +38,11 @@ class TestTaskStatus:
     def test_has_failed_value(self):
         assert TaskStatus.FAILED == "failed"
 
-    def test_has_exactly_four_values(self):
-        assert len(TaskStatus) == 4
+    def test_has_cancelled_value(self):
+        assert TaskStatus.CANCELLED == "cancelled"
+
+    def test_has_exactly_five_values(self):
+        assert len(TaskStatus) == 5
 
 
 class TestPackStep:

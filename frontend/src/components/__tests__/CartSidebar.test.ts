@@ -1,10 +1,21 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, vi } from "vitest"
 import { mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import { createRouter, createMemoryHistory } from "vue-router"
 import CartSidebar from "@/components/CartSidebar.vue"
 import { useCartStore } from "@/stores/cart"
 import type { Plugin } from "@/types/marketplace"
+
+let mockIsPacking = false
+const mockAppendPack = vi.fn()
+
+vi.mock("@/stores/packager", () => ({
+  usePackagerStore: () => ({
+    isPacking: mockIsPacking,
+    appendPack: mockAppendPack,
+    startPackFromCart: vi.fn(),
+  }),
+}))
 
 function createMockPlugin(overrides: Partial<Plugin> = {}): Plugin {
   return {
@@ -39,6 +50,8 @@ describe("CartSidebar", () => {
   beforeEach(async () => {
     sessionStorage.clear()
     setActivePinia(createPinia())
+    mockIsPacking = false
+    mockAppendPack.mockReset()
 
     router = createRouter({
       history: createMemoryHistory(),
@@ -166,5 +179,45 @@ describe("CartSidebar", () => {
     const panel = wrapper.find("[data-testid='sidebar-panel']")
     expect(panel.classes()).toContain("w-96")
     expect(panel.classes()).toContain("max-w-full")
+  })
+
+  it("should show append-pack button when isPacking is true", () => {
+    mockIsPacking = true
+    const cartStore = useCartStore()
+    cartStore.addItem(createMockPlugin())
+
+    const wrapper = mount(CartSidebar, { global: { plugins: [router] } })
+    expect(wrapper.find("[data-testid='append-pack-btn']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='start-pack-btn']").exists()).toBe(false)
+  })
+
+  it("should show start-pack button when isPacking is false", () => {
+    mockIsPacking = false
+    const cartStore = useCartStore()
+    cartStore.addItem(createMockPlugin())
+
+    const wrapper = mount(CartSidebar, { global: { plugins: [router] } })
+    expect(wrapper.find("[data-testid='start-pack-btn']").exists()).toBe(true)
+    expect(wrapper.find("[data-testid='append-pack-btn']").exists()).toBe(false)
+  })
+
+  it("should call appendPack when append-pack button is clicked", async () => {
+    mockIsPacking = true
+    const cartStore = useCartStore()
+    cartStore.addItem(createMockPlugin())
+
+    const wrapper = mount(CartSidebar, { global: { plugins: [router] } })
+    const appendBtn = wrapper.find("[data-testid='append-pack-btn']")
+    await appendBtn.trigger("click")
+
+    expect(mockAppendPack).toHaveBeenCalledWith(cartStore.items)
+    expect(cartStore.isOpen).toBe(false)
+  })
+
+  it("should disable append-pack button when cart is empty", () => {
+    mockIsPacking = true
+    const wrapper = mount(CartSidebar, { global: { plugins: [router] } })
+    const appendBtn = wrapper.find("[data-testid='append-pack-btn']")
+    expect(appendBtn.attributes("disabled")).toBeDefined()
   })
 })

@@ -1,9 +1,17 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, vi } from "vitest"
 import { mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import NavBar from "@/components/NavBar.vue"
 import { useCartStore } from "@/stores/cart"
 import type { Plugin } from "@/types/marketplace"
+
+let mockIsPacking = false
+
+vi.mock("@/stores/packager", () => ({
+  usePackagerStore: () => ({
+    isPacking: mockIsPacking,
+  }),
+}))
 
 function createMockPlugin(overrides: Partial<Plugin> = {}): Plugin {
   return {
@@ -36,6 +44,7 @@ describe("NavBar", () => {
   beforeEach(() => {
     sessionStorage.clear()
     setActivePinia(createPinia())
+    mockIsPacking = false
   })
 
   it("should display application name", () => {
@@ -93,5 +102,19 @@ describe("NavBar", () => {
     const wrapper = mount(NavBar)
     const header = wrapper.find("header")
     expect(header.classes()).toContain("fixed")
+  })
+
+  it("should add animate-pulse class to cart icon when isPacking is true", () => {
+    mockIsPacking = true
+    const wrapper = mount(NavBar)
+    const icon = wrapper.find("[data-testid='cart-icon']")
+    expect(icon.classes()).toContain("animate-pulse")
+  })
+
+  it("should not add animate-pulse class to cart icon when isPacking is false", () => {
+    mockIsPacking = false
+    const wrapper = mount(NavBar)
+    const icon = wrapper.find("[data-testid='cart-icon']")
+    expect(icon.classes()).not.toContain("animate-pulse")
   })
 })

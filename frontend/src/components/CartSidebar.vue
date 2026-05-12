@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import { useRouter } from "vue-router"
 import { useCartStore } from "@/stores/cart"
+import { usePackagerStore } from "@/stores/packager"
 import CartItem from "@/components/CartItem.vue"
 
 const router = useRouter()
 const cartStore = useCartStore()
+const packagerStore = usePackagerStore()
 
 function startPack(): void {
   cartStore.closeSidebar()
   router.push({ name: "package" })
+}
+
+function appendPack(): void {
+  packagerStore.appendPack(cartStore.items)
+  cartStore.closeSidebar()
 }
 </script>
 
@@ -110,6 +117,7 @@ function startPack(): void {
 
       <div class="border-t border-gray-200 p-4">
         <button
+          v-if="!packagerStore.isPacking"
           data-testid="start-pack-btn"
           class="w-full py-2.5 rounded-lg text-white font-medium transition-colors"
           :class="cartStore.isEmpty
@@ -119,6 +127,18 @@ function startPack(): void {
           @click="startPack"
         >
           开始打包
+        </button>
+        <button
+          v-else
+          data-testid="append-pack-btn"
+          class="w-full py-2.5 rounded-lg text-white font-medium transition-colors"
+          :class="cartStore.isEmpty
+            ? 'bg-gray-300 cursor-not-allowed'
+            : 'bg-blue-600 hover:bg-blue-700'"
+          :disabled="cartStore.isEmpty"
+          @click="appendPack"
+        >
+          追加到打包
         </button>
       </div>
     </div>

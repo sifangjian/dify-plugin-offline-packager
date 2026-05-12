@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useCartStore } from "@/stores/cart"
+import { usePackagerStore } from "@/stores/packager"
 
 const cartStore = useCartStore()
+const packagerStore = usePackagerStore()
 </script>
 
 <template>
@@ -16,6 +18,8 @@ const cartStore = useCartStore()
       <svg
         xmlns="http://www.w3.org/2000/svg"
         class="w-6 h-6"
+        :class="{ 'animate-pulse': packagerStore.isPacking }"
+        data-testid="cart-icon"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
