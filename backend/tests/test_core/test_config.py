@@ -14,6 +14,7 @@ class TestSettings:
         assert settings.PORT == 8080
         assert settings.MAX_UPLOAD_SIZE_MB == 500
         assert settings.WORK_DIR == "/app/workspace"
+        assert settings.STATIC_DIR == "frontend/dist"
 
     def test_env_override_marketplace_api_url(self):
         with patch.dict(os.environ, {"MARKETPLACE_API_URL": "https://custom.api"}):
@@ -49,6 +50,17 @@ class TestSettings:
         with patch.dict(os.environ, {"GITHUB_API_URL": "https://github.enterprise.com"}):
             settings = Settings()
             assert settings.GITHUB_API_URL == "https://github.enterprise.com"
+
+    def test_env_override_static_dir(self):
+        with patch.dict(os.environ, {"STATIC_DIR": "/app/static"}):
+            settings = Settings()
+            assert settings.STATIC_DIR == "/app/static"
+
+    def test_static_dir_dotenv_override(self, tmp_path):
+        env_file = tmp_path / ".env"
+        env_file.write_text("STATIC_DIR=custom/path\n", encoding="utf-8")
+        settings = Settings(_env_file=str(env_file))
+        assert settings.STATIC_DIR == "custom/path"
 
 
 class TestGetSettings:

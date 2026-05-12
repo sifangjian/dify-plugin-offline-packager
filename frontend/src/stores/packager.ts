@@ -31,8 +31,12 @@ function loadFromStorage(): { sessions: Map<string, SessionState>; tasks: Map<st
   if (!raw) return { sessions: new Map(), tasks: new Map() }
   try {
     const data = JSON.parse(raw)
-    const sessions = new Map(data.sessions.map((s: SessionState) => [s.sessionId, s]))
-    const tasks = new Map(data.tasks.map((t: PackTaskProgress) => [t.taskId, t]))
+    const sessions: Map<string, SessionState> = new Map(
+      data.sessions.map((s: SessionState) => [s.sessionId, s] as [string, SessionState]),
+    )
+    const tasks: Map<string, PackTaskProgress> = new Map(
+      data.tasks.map((t: PackTaskProgress) => [t.taskId, t] as [string, PackTaskProgress]),
+    )
     return { sessions, tasks }
   } catch {
     return { sessions: new Map(), tasks: new Map() }

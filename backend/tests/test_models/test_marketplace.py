@@ -11,6 +11,7 @@ from app.models.marketplace import (
     I18nText,
     PluginInfo,
     PluginResource,
+    PluginTag,
     PluginVerification,
     SearchRequest,
     SearchResponse,
@@ -105,7 +106,7 @@ class TestPluginInfo:
             latest_version="0.0.1",
             latest_package_identifier="abc123",
             status="active",
-            tags=["agent", "tool"],
+            tags=[PluginTag(name="agent"), PluginTag(name="tool")],
             verification=PluginVerification(authorized_category="agent"),
             badges=[{"id": "verified", "label": "Verified"}],
             repository="https://github.com/langgenius/agent",
@@ -119,6 +120,7 @@ class TestPluginInfo:
         assert plugin.verification.authorized_category == "agent"
         assert plugin.resource.memory == 512
         assert len(plugin.tags) == 2
+        assert plugin.tags[0].name == "agent"
 
     def test_missing_required_field_type(self):
         with pytest.raises(ValidationError) as exc_info:

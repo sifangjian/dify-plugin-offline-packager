@@ -14,6 +14,10 @@ class PluginResource(BaseModel):
     memory: int = 0
 
 
+class PluginTag(BaseModel):
+    name: str = ""
+
+
 class PluginInfo(BaseModel):
     type: str
     name: str
@@ -30,7 +34,7 @@ class PluginInfo(BaseModel):
     latest_version: str = ""
     latest_package_identifier: str = ""
     status: str = ""
-    tags: list[str] = []
+    tags: list[PluginTag] = []
     verification: PluginVerification | None = None
     badges: list[dict] = []
     repository: str | None = None
