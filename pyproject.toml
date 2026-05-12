@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     "python-multipart>=0.0.18",
     "aiofiles>=24.0.0",
+    "sse-starlette>=3.4.3",
 ]
 
 [dependency-groups]

@@ -19,6 +19,26 @@ class MarketplaceAPIError(AppException):
         super().__init__(message=message, code=code, status_code=status_code)
 
 
+class PackageError(AppException):
+    def __init__(
+        self,
+        message: str = "打包过程失败",
+        code: str = "PACKAGE_ERROR",
+        status_code: int = 500,
+    ):
+        super().__init__(message=message, code=code, status_code=status_code)
+
+
+class StorageError(AppException):
+    def __init__(
+        self,
+        message: str = "文件存储操作失败",
+        code: str = "STORAGE_ERROR",
+        status_code: int = 500,
+    ):
+        super().__init__(message=message, code=code, status_code=status_code)
+
+
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,

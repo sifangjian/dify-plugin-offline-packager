@@ -13,12 +13,12 @@ class TestLifespanStartup:
             assert hasattr(app.state, "httpx_client")
             assert isinstance(app.state.httpx_client, httpx.AsyncClient)
 
-    async def test_httpx_client_timeout_is_10_seconds(self):
+    async def test_httpx_client_timeout_is_30_seconds(self):
         app = FastAPI(lifespan=lifespan)
         async with lifespan(app):
             client = app.state.httpx_client
-            assert client.timeout.read == 10.0
-            assert client.timeout.connect == 10.0
+            assert client.timeout.read == 30.0
+            assert client.timeout.connect == 30.0
 
 
 class TestLifespanShutdown:

@@ -3,11 +3,11 @@
     <button
       v-for="cat in CATEGORIES"
       :key="cat.value"
+      @click="emit('update:category', cat.value)"
       :class="category === cat.value
         ? 'bg-blue-500 text-white'
         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
       class="px-3 py-1.5 text-sm rounded-full whitespace-nowrap shrink-0"
-      @click="emit('update:category', cat.value)"
     >
       {{ cat.label }}
     </button>

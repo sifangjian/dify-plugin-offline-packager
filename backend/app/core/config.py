@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     PORT: int = 8080
     MAX_UPLOAD_SIZE_MB: int = 500
     WORK_DIR: str = "/app/workspace"
+    DIFY_PLUGIN_CLI_PATH: str = "/app/dify-plugin-linux-amd64-5g"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
