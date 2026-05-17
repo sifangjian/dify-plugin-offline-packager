@@ -25,11 +25,13 @@ export function useSSE(options: UseSSEOptions): UseSSEReturn {
   const maxRetries = options.reconnectAttempts ?? 3
   const retryDelay = options.reconnectInterval ?? 3000
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let isManualDisconnect = false
 
   function connect(sessionId: string): void {
     disconnect()
     currentSessionId = sessionId
     retryCount = 0
+    isManualDisconnect = false
     createEventSource(sessionId)
   }
 
@@ -67,6 +69,10 @@ export function useSSE(options: UseSSEOptions): UseSSEReturn {
       eventSource?.close()
       eventSource = null
 
+      if (isManualDisconnect) {
+        return
+      }
+
       if (retryCount < maxRetries) {
         retryCount++
         reconnectTimer = setTimeout(() => {
@@ -81,6 +87,7 @@ export function useSSE(options: UseSSEOptions): UseSSEReturn {
   }
 
   function disconnect(): void {
+    isManualDisconnect = true
     if (reconnectTimer) {
       clearTimeout(reconnectTimer)
       reconnectTimer = null

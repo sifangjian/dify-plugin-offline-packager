@@ -537,7 +537,26 @@ describe("usePackagerStore", () => {
       expect(mockStartPack).toHaveBeenCalledTimes(2)
     })
 
-    it("should not retry non-failed task", async () => {
+    it("should delete cancelled task and resubmit", async () => {
+      mockStartPack.mockResolvedValue(createPackResponse())
+      mockCancelSession.mockResolvedValue(undefined)
+      const store = usePackagerStore()
+      await store.startPackFromCart([createMockPlugin()])
+
+      await store.cancelPack()
+
+      mockStartPack.mockResolvedValue(createPackResponse({
+        session_id: "session-2",
+        tasks: [{ task_id: "task-2", author: "langgenius", name: "google-search", version: "1.0.0", status: "pending" }],
+      }))
+
+      store.retryFailed("task-1")
+
+      expect(store.tasks.has("task-1")).toBe(false)
+      expect(mockStartPack).toHaveBeenCalledTimes(2)
+    })
+
+    it("should not retry non-failed and non-cancelled task", async () => {
       mockStartPack.mockResolvedValue(createPackResponse())
       const store = usePackagerStore()
       await store.startPackFromCart([createMockPlugin()])

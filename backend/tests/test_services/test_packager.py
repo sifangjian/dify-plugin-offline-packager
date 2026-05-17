@@ -435,11 +435,7 @@ class TestStepDownloadDeps:
         plugin_dir = storage.get_plugin_dir(task.task_id)
         (plugin_dir / "requirements.txt").write_text("flask==2.0\n")
 
-        mock_proc = AsyncMock()
-        mock_proc.communicate = AsyncMock(return_value=(b"", b""))
-        mock_proc.returncode = 0
-
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch.object(packager, "_run_subprocess_with_progress", return_value=(0, b"")):
             await packager._step_download_deps(task)
 
         assert task.current_step == PackStep.DOWNLOADING_DEPS
@@ -452,11 +448,7 @@ class TestStepDownloadDeps:
         plugin_dir = storage.get_plugin_dir(task.task_id)
         (plugin_dir / "requirements.txt").write_text("flask==2.0\n")
 
-        mock_proc = AsyncMock()
-        mock_proc.communicate = AsyncMock(return_value=(b"", b""))
-        mock_proc.returncode = 0
-
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch.object(packager, "_run_subprocess_with_progress", return_value=(0, b"")):
             await packager._step_download_deps(task)
 
         assert (plugin_dir / "wheels").is_dir()
@@ -469,15 +461,12 @@ class TestStepDownloadDeps:
         plugin_dir = storage.get_plugin_dir(task.task_id)
         (plugin_dir / "requirements.txt").write_text("flask==2.0\n")
 
-        mock_proc = AsyncMock()
-        mock_proc.communicate = AsyncMock(return_value=(b"", b""))
-        mock_proc.returncode = 0
-
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+        mock_run = AsyncMock(return_value=(0, b""))
+        with patch.object(packager, "_run_subprocess_with_progress", mock_run):
             await packager._step_download_deps(task)
 
-        call_args = mock_exec.call_args
-        cmd = call_args[0]
+        call_args = mock_run.call_args
+        cmd = call_args[0][1]
         assert cmd[0] == "python3"
         assert cmd[1] == "-m"
         assert cmd[2] == "pip"
@@ -490,12 +479,8 @@ class TestStepDownloadDeps:
         plugin_dir = storage.get_plugin_dir(task.task_id)
         (plugin_dir / "requirements.txt").write_text("flask==2.0\n")
 
-        mock_proc = AsyncMock()
-        mock_proc.communicate = AsyncMock(return_value=(b"", b"pip error"))
-        mock_proc.returncode = 1
-
         with (
-            patch("asyncio.create_subprocess_exec", return_value=mock_proc),
+            patch.object(packager, "_run_subprocess_with_progress", return_value=(1, b"pip error")),
             pytest.raises(PackageStepError) as exc_info,
         ):
             await packager._step_download_deps(task)

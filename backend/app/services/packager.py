@@ -19,6 +19,7 @@ import asyncio
 import contextlib
 import uuid
 import zipfile
+from collections.abc import Callable
 from datetime import datetime
 
 import httpx
@@ -106,6 +107,7 @@ class PackagerService:
         self._tasks: dict[str, PackTaskInfo] = {}
         self._subscribers: dict[str, list[asyncio.Queue]] = {}
         self._consumer_task: asyncio.Task | None = None
+        self._running_processes: dict[str, asyncio.subprocess.Process] = {}
 
     def start(self) -> None:
         """
@@ -186,6 +188,122 @@ class PackagerService:
                 self._queue.task_done()
                 self._check_session_completion(task.session_id)
 
+    def _is_task_cancelled(self, task: PackTaskInfo) -> bool:
+        """
+        检查任务是否已被取消
+
+        Args:
+            task: 任务信息
+
+        Returns:
+            bool: 任务已取消返回 True
+        """
+        return task.status == TaskStatus.CANCELLED
+
+    async def _run_subprocess(
+        self,
+        task: PackTaskInfo,
+        cmd: list[str],
+        cwd: str | None = None,
+    ) -> tuple[int, bytes, bytes]:
+        """
+        运行子进程，支持取消时终止
+
+        Args:
+            task: 任务信息，用于跟踪进程
+            cmd: 命令和参数列表
+            cwd: 工作目录
+
+        Returns:
+            tuple[int, bytes, bytes]: 返回码、标准输出、标准错误
+
+        Raises:
+            RuntimeError: 任务被取消时抛出
+        """
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=cwd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        self._running_processes[task.task_id] = proc
+
+        try:
+            stdout, stderr = await proc.communicate()
+            if self._is_task_cancelled(task):
+                raise RuntimeError("Task cancelled")
+            return proc.returncode or 0, stdout, stderr
+        finally:
+            self._running_processes.pop(task.task_id, None)
+
+    def _terminate_process(self, task_id: str) -> None:
+        """
+        终止指定任务的子进程
+
+        Args:
+            task_id: 任务ID
+        """
+        proc = self._running_processes.get(task_id)
+        if proc and proc.returncode is None:
+            proc.terminate()
+
+    async def _run_subprocess_with_progress(
+        self,
+        task: PackTaskInfo,
+        cmd: list[str],
+        cwd: str | None = None,
+        progress_callback: Callable | None = None,
+    ) -> tuple[int, bytes]:
+        """
+        运行子进程，实时读取输出并推送进度
+
+        Args:
+            task: 任务信息，用于跟踪进程
+            cmd: 命令和参数列表
+            cwd: 工作目录
+            progress_callback: 进度回调函数，接收每行输出
+
+        Returns:
+            tuple[int, bytes]: 返回码、标准错误
+
+        Raises:
+            RuntimeError: 任务被取消时抛出
+        """
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=cwd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        self._running_processes[task.task_id] = proc
+
+        stdout_lines: list[str] = []
+        stderr_lines: list[str] = []
+
+        async def read_stream(stream, lines: list[str], is_stderr: bool):
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                line_str = line.decode().strip()
+                lines.append(line_str)
+                if progress_callback:
+                    progress_callback(line_str)
+
+        try:
+            await asyncio.gather(
+                read_stream(proc.stdout, stdout_lines, False),
+                read_stream(proc.stderr, stderr_lines, True),
+            )
+            await proc.wait()
+
+            if self._is_task_cancelled(task):
+                raise RuntimeError("Task cancelled")
+
+            return proc.returncode or 0, "\n".join(stderr_lines).encode()
+        finally:
+            self._running_processes.pop(task.task_id, None)
+
     async def _process_task(self, task: PackTaskInfo) -> None:
         """
         处理单个打包任务
@@ -199,6 +317,9 @@ class PackagerService:
         Args:
             task: 待处理的任务信息
         """
+        if self._is_task_cancelled(task):
+            return
+
         task.status = TaskStatus.RUNNING
         task.updated_at = datetime.now()
         self._emit_event(
@@ -217,6 +338,9 @@ class PackagerService:
             else:
                 await self._pack_local_plugin(task)
 
+            if self._is_task_cancelled(task):
+                return
+
             task.status = TaskStatus.SUCCESS
             task.updated_at = datetime.now()
             self._emit_event(
@@ -229,6 +353,8 @@ class PackagerService:
                 )
             )
         except PackageStepError as e:
+            if self._is_task_cancelled(task):
+                return
             task.status = TaskStatus.FAILED
             task.current_step = e.step
             task.error_message = e.message
@@ -264,9 +390,17 @@ class PackagerService:
             PackageStepError: 任一步骤失败时抛出
         """
         await self._storage.create_task_dirs(task.task_id)
+        if self._is_task_cancelled(task):
+            return
         await self._step_download(task)
+        if self._is_task_cancelled(task):
+            return
         await self._step_resolve_deps(task)
+        if self._is_task_cancelled(task):
+            return
         await self._step_download_deps(task)
+        if self._is_task_cancelled(task):
+            return
         await self._step_package(task)
 
     async def _pack_local_plugin(self, task: PackTaskInfo) -> None:
@@ -286,8 +420,14 @@ class PackagerService:
             PackageStepError: 任一步骤失败时抛出
         """
         await self._storage.create_task_dirs(task.task_id)
+        if self._is_task_cancelled(task):
+            return
         await self._step_resolve_deps(task)
+        if self._is_task_cancelled(task):
+            return
         await self._step_download_deps(task)
+        if self._is_task_cancelled(task):
+            return
         await self._step_package(task)
 
     async def _step_download(self, task: PackTaskInfo) -> None:
@@ -381,36 +521,32 @@ class PackagerService:
 
         if has_pyproject and not has_requirements:
             try:
-                proc = await asyncio.create_subprocess_exec(
-                    "uv",
-                    "lock",
+                returncode, _stdout, stderr = await self._run_subprocess(
+                    task,
+                    ["uv", "lock"],
                     cwd=str(plugin_dir),
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
                 )
-                stdout, stderr = await proc.communicate()
-                if proc.returncode != 0:
+                if returncode != 0:
                     raise PackageStepError(
                         step=PackStep.RESOLVING_DEPS,
                         message="解析依赖失败",
                         raw_error=stderr.decode(),
                     )
 
-                proc = await asyncio.create_subprocess_exec(
-                    "uv",
-                    "export",
+                returncode, stdout, stderr = await self._run_subprocess(
+                    task,
+                    ["uv", "export"],
                     cwd=str(plugin_dir),
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
                 )
-                stdout, stderr = await proc.communicate()
-                if proc.returncode != 0:
+                if returncode != 0:
                     raise PackageStepError(
                         step=PackStep.RESOLVING_DEPS,
                         message="解析依赖失败",
                         raw_error=stderr.decode(),
                     )
                 (plugin_dir / "requirements.txt").write_bytes(stdout)
+            except RuntimeError:
+                return
             except PackageStepError:
                 raise
             except Exception as e:
@@ -441,6 +577,8 @@ class PackagerService:
         Raises:
             PackageStepError: 下载失败时抛出
         """
+        import re
+
         task.current_step = PackStep.DOWNLOADING_DEPS
         task.updated_at = datetime.now()
         self._emit_event(
@@ -458,32 +596,86 @@ class PackagerService:
         wheels_dir = plugin_dir / "wheels"
         wheels_dir.mkdir(exist_ok=True)
 
-        pip_mirror_url = getattr(self._settings, "PIP_MIRROR_URL", "https://pypi.org/simple")
+        pip_mirror_url = self._settings.PIP_MIRROR_URL
+        trusted_host = pip_mirror_url.split("//")[1].split("/")[0]
+
+        def on_progress(line: str):
+            print(f"[pip download] {line}")
+            if "Collecting" in line:
+                parts = line.split()
+                if len(parts) >= 2:
+                    package_info = parts[1]
+                    self._emit_event(
+                        StepProgressEvent(
+                            session_id=task.session_id,
+                            task_id=task.task_id,
+                            plugin_name=task.name,
+                            step=PackStep.DOWNLOADING_DEPS,
+                            message=STEP_MESSAGES[PackStep.DOWNLOADING_DEPS],
+                            detail=f"正在处理: {package_info}",
+                            timestamp=datetime.now(),
+                        )
+                    )
+            elif "Downloading" in line:
+                if "http" in line or "/" in line:
+                    filename = line.split("/")[-1].split("?")[0] if "/" in line else line
+                    self._emit_event(
+                        StepProgressEvent(
+                            session_id=task.session_id,
+                            task_id=task.task_id,
+                            plugin_name=task.name,
+                            step=PackStep.DOWNLOADING_DEPS,
+                            message=STEP_MESSAGES[PackStep.DOWNLOADING_DEPS],
+                            detail=f"正在下载: {filename[:50]}...",
+                            timestamp=datetime.now(),
+                        )
+                    )
+            elif "Saved" in line:
+                parts = line.split()
+                for part in parts:
+                    if part.endswith(".whl") or part.endswith(".tar.gz"):
+                        self._emit_event(
+                            StepProgressEvent(
+                                session_id=task.session_id,
+                                task_id=task.task_id,
+                                plugin_name=task.name,
+                                step=PackStep.DOWNLOADING_DEPS,
+                                message=STEP_MESSAGES[PackStep.DOWNLOADING_DEPS],
+                                detail=f"已保存: {part}",
+                                timestamp=datetime.now(),
+                            )
+                        )
+                        break
 
         try:
-            proc = await asyncio.create_subprocess_exec(
-                "python3",
-                "-m",
-                "pip",
-                "download",
-                "--prefer-binary",
-                "-r",
-                str(plugin_dir / "requirements.txt"),
-                "-d",
-                str(wheels_dir),
-                "--index-url",
-                pip_mirror_url,
+            returncode, stderr = await self._run_subprocess_with_progress(
+                task,
+                [
+                    "python3",
+                    "-m",
+                    "pip",
+                    "download",
+                    "--prefer-binary",
+                    "-r",
+                    str(plugin_dir / "requirements.txt"),
+                    "-d",
+                    str(wheels_dir),
+                    "--index-url",
+                    pip_mirror_url,
+                    "--trusted-host",
+                    trusted_host,
+                ],
                 cwd=str(plugin_dir),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                progress_callback=on_progress,
             )
-            _stdout, stderr = await proc.communicate()
-            if proc.returncode != 0:
+            if returncode != 0:
                 raise PackageStepError(
                     step=PackStep.DOWNLOADING_DEPS,
                     message="下载依赖包失败",
                     raw_error=stderr.decode(),
                 )
+        except RuntimeError:
+            return
         except PackageStepError:
             raise
         except Exception as e:
@@ -544,25 +736,27 @@ class PackagerService:
         output_path = output_dir / f"{task.name}-{task.version}-offline.difypkg"
 
         try:
-            proc = await asyncio.create_subprocess_exec(
-                self._settings.DIFY_PLUGIN_CLI_PATH,
-                "plugin",
-                "package",
-                str(plugin_dir),
-                "-o",
-                str(output_path),
-                "--max-size",
-                "5120",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            returncode, _stdout, stderr = await self._run_subprocess(
+                task,
+                [
+                    self._settings.DIFY_PLUGIN_CLI_PATH,
+                    "plugin",
+                    "package",
+                    str(plugin_dir),
+                    "-o",
+                    str(output_path),
+                    "--max-size",
+                    "5120",
+                ],
             )
-            _stdout, stderr = await proc.communicate()
-            if proc.returncode != 0:
+            if returncode != 0:
                 raise PackageStepError(
                     step=PackStep.PACKAGING,
                     message="打包离线插件失败",
                     raw_error=stderr.decode(),
                 )
+        except RuntimeError:
+            return
         except PackageStepError:
             raise
         except Exception as e:
@@ -671,7 +865,8 @@ class PackagerService:
         """
         取消打包会话
 
-        将会话中所有待处理和运行中的任务标记为已取消状态。
+        将会话中所有待处理和运行中的任务标记为已取消状态，
+        并终止正在运行的子进程。
 
         Args:
             session_id: 会话ID
@@ -688,6 +883,7 @@ class PackagerService:
             if task and task.status in (TaskStatus.PENDING, TaskStatus.RUNNING):
                 task.status = TaskStatus.CANCELLED
                 task.updated_at = datetime.now()
+                self._terminate_process(task_id)
 
         session.status = SessionStatus.COMPLETED
         self._emit_event(

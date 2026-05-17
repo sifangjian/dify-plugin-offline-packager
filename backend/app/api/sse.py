@@ -120,6 +120,8 @@ async def _event_generator(session_id: str, packager: PackagerService):
             }
             if event.event_type == SSEEventType.SESSION_COMPLETED:
                 break
+    except asyncio.CancelledError:
+        pass
     finally:
         packager.unsubscribe(session_id, queue)
 

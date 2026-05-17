@@ -112,6 +112,7 @@ class StepProgressEvent(SSEEvent):
         plugin_name: 插件名称
         step: 当前步骤
         message: 步骤描述消息
+        detail: 详细进度信息（如正在下载的包名）
     """
 
     event_type: SSEEventType = SSEEventType.STEP_PROGRESS
@@ -119,6 +120,7 @@ class StepProgressEvent(SSEEvent):
     plugin_name: str
     step: PackStep
     message: str
+    detail: str | None = None
 
 
 class TaskSuccessEvent(SSEEvent):

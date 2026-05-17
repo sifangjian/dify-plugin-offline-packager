@@ -58,6 +58,7 @@ export interface StepProgressEvent extends SSEEventBase {
   plugin_name: string
   step: PackStep
   message: string
+  detail?: string
 }
 
 export interface TaskSuccessEvent extends SSEEventBase {
@@ -99,6 +100,7 @@ export interface PackTaskProgress {
   status: TaskStatus
   currentStep: PackStep | null
   stepMessage: string | null
+  stepDetail: string | null
   errorMessage: string | null
   rawError: string | null
   logs: StepLog[]

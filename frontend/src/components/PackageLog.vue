@@ -79,6 +79,12 @@ function retry(): void {
       class="mt-2 text-sm text-blue-700"
     >
       步骤 {{ stepIndicator }}：{{ task.stepMessage }}
+      <span
+        v-if="task.stepDetail"
+        class="block text-xs text-blue-500 mt-1"
+      >
+        {{ task.stepDetail }}
+      </span>
     </div>
 
     <div

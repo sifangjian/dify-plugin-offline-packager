@@ -89,9 +89,10 @@ export const usePackagerStore = defineStore("packager", () => {
           task.status = "running"
           task.currentStep = event.step
           task.stepMessage = event.message
+          task.stepDetail = event.detail || null
           task.logs.push({
             step: event.step,
-            message: event.message,
+            message: event.detail || event.message,
             timestamp: event.timestamp,
           })
         }
@@ -180,6 +181,7 @@ export const usePackagerStore = defineStore("packager", () => {
       status: "pending",
       currentStep: null,
       stepMessage: null,
+      stepDetail: null,
       errorMessage: null,
       rawError: null,
       logs: [],
@@ -241,7 +243,15 @@ export const usePackagerStore = defineStore("packager", () => {
       }
     }
 
-    await Promise.all(activeSessions.map((sid) => cancelSession(sid)))
+    for (const sid of activeSessions) {
+      disconnectSSE(sid)
+    }
+
+    try {
+      await Promise.all(activeSessions.map((sid) => cancelSession(sid)))
+    } catch {
+      // ignore cancel API errors
+    }
 
     for (const task of tasks.value.values()) {
       if (task.status === "pending" || task.status === "running") {
@@ -250,7 +260,6 @@ export const usePackagerStore = defineStore("packager", () => {
     }
 
     for (const sid of activeSessions) {
-      disconnectSSE(sid)
       const session = sessions.value.get(sid)
       if (session) {
         session.completed = true
@@ -262,7 +271,7 @@ export const usePackagerStore = defineStore("packager", () => {
 
   function retryFailed(taskId: string): void {
     const task = tasks.value.get(taskId)
-    if (!task || task.status !== "failed") return
+    if (!task || (task.status !== "failed" && task.status !== "cancelled")) return
 
     const plugin: PackPluginItem = {
       author: task.author,
