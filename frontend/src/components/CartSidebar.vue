@@ -8,7 +8,8 @@ const router = useRouter()
 const cartStore = useCartStore()
 const packagerStore = usePackagerStore()
 
-function startPack(): void {
+async function startPack(): Promise<void> {
+  await packagerStore.startPackFromCart(cartStore.items)
   cartStore.closeSidebar()
   router.push({ name: "package" })
 }

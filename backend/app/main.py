@@ -1,3 +1,13 @@
+"""
+FastAPI 应用入口模块
+
+创建并配置 FastAPI 应用实例：
+- 注册 API 路由
+- 配置异常处理器
+- 挂载静态文件服务
+- 配置 SPA 路由回退
+"""
+
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -30,6 +40,18 @@ if _static_dir.is_dir():
 
     @app.get("/{path:path}")
     async def serve_spa(path: str) -> FileResponse:
+        """
+        SPA 路由回退处理
+
+        对于所有未匹配的路由，返回前端 index.html，
+        支持前端路由（如 Vue Router 的 history 模式）。
+
+        Args:
+            path: 请求路径
+
+        Returns:
+            FileResponse: 静态文件响应
+        """
         file_path = _static_dir / path
         if file_path.is_file():
             return FileResponse(file_path)

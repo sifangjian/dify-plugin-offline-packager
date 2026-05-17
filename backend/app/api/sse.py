@@ -1,3 +1,17 @@
+"""
+SSE API 接口模块
+
+提供 Server-Sent Events (SSE) 接口，用于实时推送打包进度：
+- GET /sse/pack/{session_id}: 订阅打包进度事件
+
+SSE 连接流程：
+1. 客户端发起 SSE 请求
+2. 服务端推送 session_started 事件
+3. 推送每个任务的 task_started 和当前状态
+4. 持续推送 step_progress、task_success/failed 事件
+5. 推送 session_completed 事件后关闭连接
+"""
+
 import asyncio
 import json
 
@@ -13,6 +27,17 @@ router = APIRouter(prefix="/sse", tags=["sse"])
 
 
 def get_packager_service(request: Request) -> PackagerService:
+    """
+    获取打包服务实例
+
+    从应用状态中获取全局打包服务实例。
+
+    Args:
+        request: FastAPI 请求对象
+
+    Returns:
+        PackagerService: 打包服务实例
+    """
     return request.app.state.packager_service
 
 
@@ -20,6 +45,22 @@ _PACKAGER_DEP = Depends(get_packager_service)
 
 
 async def _event_generator(session_id: str, packager: PackagerService):
+    """
+    SSE 事件生成器
+
+    生成 SSE 事件流的异步生成器函数。
+    负责订阅会话事件、推送初始状态、持续监听新事件。
+
+    Args:
+        session_id: 会话ID
+        packager: 打包服务实例
+
+    Yields:
+        dict: SSE 事件字典，包含 event 和 data 字段
+
+    Note:
+        使用 try-finally 确保在连接断开时取消订阅
+    """
     from datetime import datetime
 
     session = packager.get_session(session_id)
@@ -88,6 +129,24 @@ async def sse_pack_progress(
     session_id: str,
     packager: PackagerService = _PACKAGER_DEP,
 ):
+    """
+    订阅打包进度
+
+    建立 SSE 连接，实时接收打包进度事件。
+
+    Args:
+        session_id: 会话ID
+        packager: 打包服务实例（依赖注入）
+
+    Returns:
+        EventSourceResponse: SSE 响应流
+
+    Raises:
+        PackageError: 会话不存在时抛出 404 错误
+
+    Note:
+        连接会在 session_completed 事件后自动关闭
+    """
     session = packager.get_session(session_id)
     if not session:
         raise PackageError("未找到该打包任务", code="NOT_FOUND", status_code=404)
