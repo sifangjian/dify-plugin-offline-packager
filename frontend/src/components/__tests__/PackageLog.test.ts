@@ -24,6 +24,8 @@ function createTask(overrides: Partial<PackTaskProgress> = {}): PackTaskProgress
     status: "pending",
     currentStep: null,
     stepMessage: null,
+    stepDetail: null,
+    progress: null,
     errorMessage: null,
     rawError: null,
     logs: [],
@@ -74,15 +76,15 @@ describe("PackageLog", () => {
       expect(wrapper.text()).toContain("正在解析依赖...")
     })
 
-    it("should show expand log button", () => {
+    it("should show log panel auto-expanded when running", () => {
       const wrapper = mount(PackageLog, {
         props: { task: createTask({ status: "running" }) },
       })
 
-      expect(wrapper.text()).toContain("查看详细日志")
+      expect(wrapper.text()).toContain("收起日志")
     })
 
-    it("should expand log on click and show log entries", async () => {
+    it("should show log entries in auto-expanded panel", async () => {
       const task = createTask({
         status: "running",
         currentStep: "resolving_deps",
@@ -96,13 +98,11 @@ describe("PackageLog", () => {
         props: { task },
       })
 
-      await wrapper.find("[data-testid='toggle-log-btn']").trigger("click")
-
       expect(wrapper.text()).toContain("正在下载插件包...")
       expect(wrapper.text()).toContain("正在解析依赖...")
     })
 
-    it("should collapse log on second click", async () => {
+    it("should collapse log on click and expand on second click", async () => {
       const task = createTask({
         status: "running",
         logs: [
@@ -113,11 +113,13 @@ describe("PackageLog", () => {
         props: { task },
       })
 
-      await wrapper.find("[data-testid='toggle-log-btn']").trigger("click")
       expect(wrapper.text()).toContain("收起日志")
 
       await wrapper.find("[data-testid='toggle-log-btn']").trigger("click")
       expect(wrapper.text()).toContain("查看详细日志")
+
+      await wrapper.find("[data-testid='toggle-log-btn']").trigger("click")
+      expect(wrapper.text()).toContain("收起日志")
     })
   })
 

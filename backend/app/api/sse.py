@@ -19,8 +19,17 @@ from fastapi import APIRouter, Depends, Request
 from sse_starlette.sse import EventSourceResponse
 
 from app.core.exceptions import PackageError
-from app.models.plugin import TaskStatus
-from app.models.sse import SessionStartedEvent, SSEEventType, StepProgressEvent, TaskStartedEvent
+from app.models.plugin import PackStep, SessionStatus, TaskStatus
+from app.models.sse import (
+    STEP_MESSAGES,
+    SessionCompletedEvent,
+    SessionStartedEvent,
+    SSEEventType,
+    StepProgressEvent,
+    TaskFailedEvent,
+    TaskStartedEvent,
+    TaskSuccessEvent,
+)
 from app.services.packager import PackagerService
 
 router = APIRouter(prefix="/sse", tags=["sse"])
@@ -45,22 +54,6 @@ _PACKAGER_DEP = Depends(get_packager_service)
 
 
 async def _event_generator(session_id: str, packager: PackagerService):
-    """
-    SSE 事件生成器
-
-    生成 SSE 事件流的异步生成器函数。
-    负责订阅会话事件、推送初始状态、持续监听新事件。
-
-    Args:
-        session_id: 会话ID
-        packager: 打包服务实例
-
-    Yields:
-        dict: SSE 事件字典，包含 event 和 data 字段
-
-    Note:
-        使用 try-finally 确保在连接断开时取消订阅
-    """
     from datetime import datetime
 
     session = packager.get_session(session_id)
@@ -84,11 +77,42 @@ async def _event_generator(session_id: str, packager: PackagerService):
 
         for task_id in session.task_ids:
             task = packager.get_task(task_id)
-            if task:
+            if not task:
+                continue
+
+            yield {
+                "event": SSEEventType.TASK_STARTED,
+                "data": json.dumps(
+                    TaskStartedEvent(
+                        session_id=session_id,
+                        task_id=task.task_id,
+                        plugin_name=task.name,
+                        plugin_version=task.version,
+                        timestamp=datetime.now(),
+                    ).model_dump(mode="json")
+                ),
+            }
+
+            if task.status == TaskStatus.RUNNING and task.current_step:
                 yield {
-                    "event": SSEEventType.TASK_STARTED,
+                    "event": SSEEventType.STEP_PROGRESS,
                     "data": json.dumps(
-                        TaskStartedEvent(
+                        StepProgressEvent(
+                            session_id=session_id,
+                            task_id=task.task_id,
+                            plugin_name=task.name,
+                            step=task.current_step,
+                            message=STEP_MESSAGES.get(task.current_step, ""),
+                            detail=task.step_detail,
+                            timestamp=datetime.now(),
+                        ).model_dump(mode="json")
+                    ),
+                }
+            elif task.status == TaskStatus.SUCCESS:
+                yield {
+                    "event": SSEEventType.TASK_SUCCESS,
+                    "data": json.dumps(
+                        TaskSuccessEvent(
                             session_id=session_id,
                             task_id=task.task_id,
                             plugin_name=task.name,
@@ -97,20 +121,38 @@ async def _event_generator(session_id: str, packager: PackagerService):
                         ).model_dump(mode="json")
                     ),
                 }
-                if task.status == TaskStatus.RUNNING and task.current_step:
-                    yield {
-                        "event": SSEEventType.STEP_PROGRESS,
-                        "data": json.dumps(
-                            StepProgressEvent(
-                                session_id=session_id,
-                                task_id=task.task_id,
-                                plugin_name=task.name,
-                                step=task.current_step,
-                                message="",
-                                timestamp=datetime.now(),
-                            ).model_dump(mode="json")
-                        ),
-                    }
+            elif task.status == TaskStatus.FAILED:
+                yield {
+                    "event": SSEEventType.TASK_FAILED,
+                    "data": json.dumps(
+                        TaskFailedEvent(
+                            session_id=session_id,
+                            task_id=task.task_id,
+                            plugin_name=task.name,
+                            step=task.current_step or PackStep.DOWNLOADING,
+                            message=task.error_message or "",
+                            raw_error=task.raw_error or "",
+                            timestamp=datetime.now(),
+                        ).model_dump(mode="json")
+                    ),
+                }
+
+        if session.status == SessionStatus.COMPLETED:
+            tasks = [packager.get_task(tid) for tid in session.task_ids]
+            success_count = sum(1 for t in tasks if t and t.status == TaskStatus.SUCCESS)
+            failed_count = sum(1 for t in tasks if t and t.status in (TaskStatus.FAILED, TaskStatus.CANCELLED))
+            yield {
+                "event": SSEEventType.SESSION_COMPLETED,
+                "data": json.dumps(
+                    SessionCompletedEvent(
+                        session_id=session_id,
+                        success_count=success_count,
+                        failed_count=failed_count,
+                        timestamp=datetime.now(),
+                    ).model_dump(mode="json")
+                ),
+            }
+            return
 
         while True:
             event = await queue.get()

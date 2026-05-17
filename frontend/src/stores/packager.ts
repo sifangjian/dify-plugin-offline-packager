@@ -90,11 +90,15 @@ export const usePackagerStore = defineStore("packager", () => {
           task.currentStep = event.step
           task.stepMessage = event.message
           task.stepDetail = event.detail || null
+          task.progress = event.progress || null
           task.logs.push({
             step: event.step,
             message: event.detail || event.message,
             timestamp: event.timestamp,
           })
+          if (task.logs.length > 200) {
+            task.logs.splice(0, task.logs.length - 200)
+          }
         }
         break
       }
@@ -151,6 +155,20 @@ export const usePackagerStore = defineStore("packager", () => {
       onError: () => {
         connectionError.value = "连接已断开，打包可能仍在后台进行，请刷新页面查看"
       },
+      onNotFound: () => {
+        const session = sessions.value.get(sessionId)
+        if (session) {
+          session.completed = true
+        }
+        for (const taskId of session?.taskIds || []) {
+          const task = tasks.value.get(taskId)
+          if (task && (task.status === "pending" || task.status === "running")) {
+            task.status = "failed"
+            task.errorMessage = "会话不存在，请重新打包"
+          }
+        }
+        persistState()
+      },
     })
 
     sseConnections.set(sessionId, sse)
@@ -182,6 +200,7 @@ export const usePackagerStore = defineStore("packager", () => {
       currentStep: null,
       stepMessage: null,
       stepDetail: null,
+      progress: null,
       errorMessage: null,
       rawError: null,
       logs: [],

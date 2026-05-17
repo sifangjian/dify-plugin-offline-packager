@@ -113,6 +113,7 @@ class StepProgressEvent(SSEEvent):
         step: 当前步骤
         message: 步骤描述消息
         detail: 详细进度信息（如正在下载的包名）
+        progress: 量化进度信息，包含当前值和总值
     """
 
     event_type: SSEEventType = SSEEventType.STEP_PROGRESS
@@ -121,6 +122,7 @@ class StepProgressEvent(SSEEvent):
     step: PackStep
     message: str
     detail: str | None = None
+    progress: dict | None = None
 
 
 class TaskSuccessEvent(SSEEvent):

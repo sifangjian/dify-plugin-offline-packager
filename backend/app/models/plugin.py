@@ -185,6 +185,7 @@ class PackTaskInfo(BaseModel):
     local_file_path: Path | None = None
     status: TaskStatus = TaskStatus.PENDING
     current_step: PackStep | None = None
+    step_detail: str | None = None
     error_message: str | None = None
     raw_error: str | None = None
     result_file_path: Path | None = None

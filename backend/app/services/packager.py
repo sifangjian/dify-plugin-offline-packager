@@ -17,6 +17,8 @@
 
 import asyncio
 import contextlib
+import os
+import time
 import uuid
 import zipfile
 from collections.abc import Callable
@@ -220,6 +222,7 @@ class PackagerService:
         Raises:
             RuntimeError: 任务被取消时抛出
         """
+        print(f"[subprocess] Running: {' '.join(cmd)}")
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=cwd,
@@ -230,6 +233,9 @@ class PackagerService:
 
         try:
             stdout, stderr = await proc.communicate()
+            print(f"[subprocess] Exit code: {proc.returncode}")
+            if stdout:
+                print(f"[subprocess] stdout: {stdout.decode()[:500]}")
             if self._is_task_cancelled(task):
                 raise RuntimeError("Task cancelled")
             return proc.returncode or 0, stdout, stderr
@@ -253,27 +259,15 @@ class PackagerService:
         cmd: list[str],
         cwd: str | None = None,
         progress_callback: Callable | None = None,
+        env: dict[str, str] | None = None,
     ) -> tuple[int, bytes]:
-        """
-        运行子进程，实时读取输出并推送进度
-
-        Args:
-            task: 任务信息，用于跟踪进程
-            cmd: 命令和参数列表
-            cwd: 工作目录
-            progress_callback: 进度回调函数，接收每行输出
-
-        Returns:
-            tuple[int, bytes]: 返回码、标准错误
-
-        Raises:
-            RuntimeError: 任务被取消时抛出
-        """
+        print(f"[subprocess] Running: {' '.join(cmd)}")
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=cwd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=env,
         )
         self._running_processes[task.task_id] = proc
 
@@ -287,6 +281,7 @@ class PackagerService:
                     break
                 line_str = line.decode().strip()
                 lines.append(line_str)
+                print(f"[{'stderr' if is_stderr else 'stdout'}] {line_str}")
                 if progress_callback:
                     progress_callback(line_str)
 
@@ -296,6 +291,7 @@ class PackagerService:
                 read_stream(proc.stderr, stderr_lines, True),
             )
             await proc.wait()
+            print(f"[subprocess] Exit code: {proc.returncode}")
 
             if self._is_task_cancelled(task):
                 raise RuntimeError("Task cancelled")
@@ -444,6 +440,7 @@ class PackagerService:
             PackageStepError: 下载失败时抛出
         """
         task.current_step = PackStep.DOWNLOADING
+        task.step_detail = None
         task.updated_at = datetime.now()
         self._emit_event(
             StepProgressEvent(
@@ -487,6 +484,7 @@ class PackagerService:
             PackageStepError: 解析失败时抛出
         """
         task.current_step = PackStep.RESOLVING_DEPS
+        task.step_detail = None
         task.updated_at = datetime.now()
         self._emit_event(
             StepProgressEvent(
@@ -564,23 +562,22 @@ class PackagerService:
             )
 
     async def _step_download_deps(self, task: PackTaskInfo) -> None:
-        """
-        步骤：下载依赖包
-
-        使用 pip download 命令下载所有依赖包到 wheels 目录。
-        支持配置 PyPI 镜像源加速下载。
-        下载的 wheel 文件将打包进离线安装包。
-
-        Args:
-            task: 任务信息
-
-        Raises:
-            PackageStepError: 下载失败时抛出
-        """
-        import re
-
         task.current_step = PackStep.DOWNLOADING_DEPS
+        task.step_detail = None
         task.updated_at = datetime.now()
+
+        plugin_dir = self._storage.get_plugin_dir(task.task_id)
+        wheels_dir = plugin_dir / "wheels"
+        wheels_dir.mkdir(exist_ok=True)
+
+        req_file = plugin_dir / "requirements.txt"
+        total_deps = 0
+        if req_file.exists():
+            total_deps = sum(
+                1 for line in req_file.read_text().splitlines()
+                if line.strip() and not line.strip().startswith("#") and not line.strip().startswith("-")
+            )
+
         self._emit_event(
             StepProgressEvent(
                 session_id=task.session_id,
@@ -588,66 +585,96 @@ class PackagerService:
                 plugin_name=task.name,
                 step=PackStep.DOWNLOADING_DEPS,
                 message=STEP_MESSAGES[PackStep.DOWNLOADING_DEPS],
+                detail=f"共 {total_deps} 个依赖包" if total_deps > 0 else None,
+                progress={"current": 0, "total": total_deps} if total_deps > 0 else None,
                 timestamp=datetime.now(),
             )
         )
 
-        plugin_dir = self._storage.get_plugin_dir(task.task_id)
-        wheels_dir = plugin_dir / "wheels"
-        wheels_dir.mkdir(exist_ok=True)
-
         pip_mirror_url = self._settings.PIP_MIRROR_URL
         trusted_host = pip_mirror_url.split("//")[1].split("/")[0]
 
+        processed_count = 0
+        last_emit_time = 0.0
+        throttle_interval = 0.2
+
         def on_progress(line: str):
+            nonlocal processed_count, last_emit_time
+
+            if "\r" in line:
+                line = line.split("\r")[-1]
+            line = line.strip()
+            if not line:
+                return
             print(f"[pip download] {line}")
+
+            detail = None
+            should_count = False
+
             if "Collecting" in line:
                 parts = line.split()
                 if len(parts) >= 2:
                     package_info = parts[1]
-                    self._emit_event(
-                        StepProgressEvent(
-                            session_id=task.session_id,
-                            task_id=task.task_id,
-                            plugin_name=task.name,
-                            step=PackStep.DOWNLOADING_DEPS,
-                            message=STEP_MESSAGES[PackStep.DOWNLOADING_DEPS],
-                            detail=f"正在处理: {package_info}",
-                            timestamp=datetime.now(),
-                        )
-                    )
+                    detail = f"正在处理: {package_info}"
+                    should_count = True
             elif "Downloading" in line:
-                if "http" in line or "/" in line:
-                    filename = line.split("/")[-1].split("?")[0] if "/" in line else line
-                    self._emit_event(
-                        StepProgressEvent(
-                            session_id=task.session_id,
-                            task_id=task.task_id,
-                            plugin_name=task.name,
-                            step=PackStep.DOWNLOADING_DEPS,
-                            message=STEP_MESSAGES[PackStep.DOWNLOADING_DEPS],
-                            detail=f"正在下载: {filename[:50]}...",
-                            timestamp=datetime.now(),
-                        )
-                    )
+                parts = line.split()
+                filename = ""
+                for part in parts:
+                    if part.endswith(".whl") or part.endswith(".tar.gz"):
+                        filename = part
+                        break
+                if not filename:
+                    if "http" in line or "/" in line:
+                        filename = line.split("/")[-1].split("?")[0]
+                    else:
+                        filename = parts[-1] if parts else line
+                detail = f"正在下载: {filename[:50]}"
+                should_count = True
             elif "Saved" in line:
                 parts = line.split()
                 for part in parts:
                     if part.endswith(".whl") or part.endswith(".tar.gz"):
-                        self._emit_event(
-                            StepProgressEvent(
-                                session_id=task.session_id,
-                                task_id=task.task_id,
-                                plugin_name=task.name,
-                                step=PackStep.DOWNLOADING_DEPS,
-                                message=STEP_MESSAGES[PackStep.DOWNLOADING_DEPS],
-                                detail=f"已保存: {part}",
-                                timestamp=datetime.now(),
-                            )
-                        )
+                        detail = f"已保存: {part}"
+                        should_count = True
                         break
 
+            if detail is None:
+                return
+
+            if should_count:
+                processed_count += 1
+
+            progress = {"current": processed_count, "total": total_deps} if total_deps > 0 else None
+            if progress and processed_count <= total_deps:
+                detail = f"正在下载依赖包 ({processed_count}/{total_deps}): {detail.split(': ', 1)[-1]}"
+
+            task.step_detail = detail
+            task.updated_at = datetime.now()
+
+            now = time.monotonic()
+            if now - last_emit_time >= throttle_interval:
+                last_emit_time = now
+                self._emit_event(
+                    StepProgressEvent(
+                        session_id=task.session_id,
+                        task_id=task.task_id,
+                        plugin_name=task.name,
+                        step=PackStep.DOWNLOADING_DEPS,
+                        message=STEP_MESSAGES[PackStep.DOWNLOADING_DEPS],
+                        detail=detail,
+                        progress=progress,
+                        timestamp=datetime.now(),
+                    )
+                )
+
         try:
+            pip_env = {
+                **os.environ,
+                "PIP_PROGRESS_BAR": "off",
+                "PIP_NO_COLOR": "1",
+                "PYTHONUNBUFFERED": "1",
+            }
             returncode, stderr = await self._run_subprocess_with_progress(
                 task,
                 [
@@ -667,6 +694,7 @@ class PackagerService:
                 ],
                 cwd=str(plugin_dir),
                 progress_callback=on_progress,
+                env=pip_env,
             )
             if returncode != 0:
                 raise PackageStepError(
@@ -686,23 +714,8 @@ class PackagerService:
             ) from None
 
     async def _step_package(self, task: PackTaskInfo) -> None:
-        """
-        步骤：打包离线插件
-
-        使用 Dify Plugin CLI 将插件及其依赖打包成离线安装包：
-        1. 修改 requirements.txt，添加离线安装配置
-        2. 修改 pyproject.toml，添加 uv 离线配置
-        3. 调用 dify-plugin CLI 生成 .difypkg 文件
-
-        生成的离线包可在无网络环境下安装使用。
-
-        Args:
-            task: 任务信息
-
-        Raises:
-            PackageStepError: 打包失败时抛出
-        """
         task.current_step = PackStep.PACKAGING
+        task.step_detail = None
         task.updated_at = datetime.now()
         self._emit_event(
             StepProgressEvent(
@@ -735,8 +748,34 @@ class PackagerService:
 
         output_path = output_dir / f"{task.name}-{task.version}-offline.difypkg"
 
+        last_emit_time = 0.0
+        throttle_interval = 0.2
+
+        def on_progress(line: str):
+            nonlocal last_emit_time
+            line = line.strip()
+            if not line:
+                return
+            print(f"[dify-plugin] {line}")
+            task.step_detail = line
+            task.updated_at = datetime.now()
+            now = time.monotonic()
+            if now - last_emit_time >= throttle_interval:
+                last_emit_time = now
+                self._emit_event(
+                    StepProgressEvent(
+                        session_id=task.session_id,
+                        task_id=task.task_id,
+                        plugin_name=task.name,
+                        step=PackStep.PACKAGING,
+                        message=STEP_MESSAGES[PackStep.PACKAGING],
+                        detail=line[:100],
+                        timestamp=datetime.now(),
+                    )
+                )
+
         try:
-            returncode, _stdout, stderr = await self._run_subprocess(
+            returncode, stderr = await self._run_subprocess_with_progress(
                 task,
                 [
                     self._settings.DIFY_PLUGIN_CLI_PATH,
@@ -748,6 +787,7 @@ class PackagerService:
                     "--max-size",
                     "5120",
                 ],
+                progress_callback=on_progress,
             )
             if returncode != 0:
                 raise PackageStepError(

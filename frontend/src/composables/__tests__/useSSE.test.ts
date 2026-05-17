@@ -249,6 +249,7 @@ describe("useSSE", () => {
       const { connect } = useSSEFresh({ onEvent, onError, reconnectAttempts: 3 })
 
       connect("session-123")
+      mockInstance!.simulateOpen()
 
       for (let i = 0; i < 3; i++) {
         mockInstance!.simulateError()
@@ -285,6 +286,26 @@ describe("useSSE", () => {
 
       mockInstance!.simulateError()
       expect(onError).toHaveBeenCalled()
+    })
+
+    it("should call onNotFound when connection never succeeded after retries", async () => {
+      const onEvent = vi.fn()
+      const onError = vi.fn()
+      const onNotFound = vi.fn()
+      const { useSSE: useSSEFresh } = await import("@/composables/useSSE")
+      const { connect } = useSSEFresh({ onEvent, onError, onNotFound, reconnectAttempts: 2 })
+
+      connect("session-123")
+
+      for (let i = 0; i < 2; i++) {
+        mockInstance!.simulateError()
+        vi.advanceTimersByTime(3000 * (i + 1))
+      }
+
+      mockInstance!.simulateError()
+
+      expect(onNotFound).toHaveBeenCalled()
+      expect(onError).not.toHaveBeenCalled()
     })
   })
 })

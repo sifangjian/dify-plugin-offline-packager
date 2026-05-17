@@ -3,110 +3,123 @@ import type { SSEEvent } from "@/types/packager"
 import type { Ref } from "vue"
 
 interface UseSSEOptions {
-  onEvent: (event: SSEEvent) => void
-  onError?: (error: Event) => void
-  reconnectAttempts?: number
-  reconnectInterval?: number
+    onEvent: (event: SSEEvent) => void
+    onError?: (error: Event) => void
+    onNotFound?: () => void
+    reconnectAttempts?: number
+    reconnectInterval?: number
 }
 
 interface UseSSEReturn {
-  connect: (sessionId: string) => void
-  disconnect: () => void
-  isConnected: Ref<boolean>
+    connect: (sessionId: string) => void
+    disconnect: () => void
+    isConnected: Ref<boolean>
 }
 
 const SSE_BASE_URL = import.meta.env.VITE_SSE_BASE_URL || "/sse"
 
 export function useSSE(options: UseSSEOptions): UseSSEReturn {
-  const isConnected = ref(false)
-  let eventSource: EventSource | null = null
-  let currentSessionId: string | null = null
-  let retryCount = 0
-  const maxRetries = options.reconnectAttempts ?? 3
-  const retryDelay = options.reconnectInterval ?? 3000
-  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-  let isManualDisconnect = false
+    const isConnected = ref(false)
+    let eventSource: EventSource | null = null
+    let currentSessionId: string | null = null
+    let retryCount = 0
+    const maxRetries = options.reconnectAttempts ?? 3
+    const retryDelay = options.reconnectInterval ?? 3000
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    let isManualDisconnect = false
+    let hasConnected = false
 
-  function connect(sessionId: string): void {
-    disconnect()
-    currentSessionId = sessionId
-    retryCount = 0
-    isManualDisconnect = false
-    createEventSource(sessionId)
-  }
-
-  function createEventSource(sessionId: string): void {
-    const url = `${SSE_BASE_URL}/pack/${sessionId}`
-    eventSource = new EventSource(url)
-
-    eventSource.onopen = () => {
-      isConnected.value = true
-      retryCount = 0
+    function connect(sessionId: string): void {
+        disconnect()
+        currentSessionId = sessionId
+        retryCount = 0
+        isManualDisconnect = false
+        hasConnected = false
+        createEventSource(sessionId)
     }
 
-    const eventTypes = [
-      "session_started",
-      "task_started",
-      "step_progress",
-      "task_success",
-      "task_failed",
-      "session_completed",
-    ]
+    function createEventSource(sessionId: string): void {
+        const url = `${SSE_BASE_URL}/pack/${sessionId}`
+        eventSource = new EventSource(url)
 
-    for (const type of eventTypes) {
-      eventSource.addEventListener(type, (event: MessageEvent) => {
-        try {
-          const data = JSON.parse(event.data) as SSEEvent
-          options.onEvent(data)
-        } catch {
-          // ignore parse failures
+        eventSource.onopen = () => {
+            isConnected.value = true
+            retryCount = 0
+            hasConnected = true
         }
-      })
+
+        const eventTypes = [
+            "session_started",
+            "task_started",
+            "step_progress",
+            "task_success",
+            "task_failed",
+            "session_completed",
+        ]
+
+        for (const type of eventTypes) {
+            eventSource.addEventListener(type, (event: MessageEvent) => {
+                try {
+                    const data = JSON.parse(event.data) as SSEEvent
+                    options.onEvent(data)
+                } catch {
+                    // ignore parse failures
+                }
+            })
+        }
+
+        eventSource.onerror = () => {
+            isConnected.value = false
+            eventSource?.close()
+            eventSource = null
+
+            if (isManualDisconnect) {
+                return
+            }
+
+            if (!hasConnected && maxRetries === 0) {
+                options.onNotFound?.()
+                return
+            }
+
+            if (retryCount < maxRetries) {
+                retryCount++
+                reconnectTimer = setTimeout(() => {
+                    if (currentSessionId) {
+                        createEventSource(currentSessionId)
+                    }
+                }, retryDelay * retryCount)
+            } else {
+                if (!hasConnected) {
+                    options.onNotFound?.()
+                } else {
+                    options.onError?.(new Event("SSE connection failed"))
+                }
+            }
+        }
     }
 
-    eventSource.onerror = () => {
-      isConnected.value = false
-      eventSource?.close()
-      eventSource = null
-
-      if (isManualDisconnect) {
-        return
-      }
-
-      if (retryCount < maxRetries) {
-        retryCount++
-        reconnectTimer = setTimeout(() => {
-          if (currentSessionId) {
-            createEventSource(currentSessionId)
-          }
-        }, retryDelay * retryCount)
-      } else {
-        options.onError?.(new Event("SSE connection failed"))
-      }
+    function disconnect(): void {
+        isManualDisconnect = true
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer)
+            reconnectTimer = null
+        }
+        if (eventSource) {
+            eventSource.close()
+            eventSource = null
+        }
+        isConnected.value = false
+        currentSessionId = null
     }
-  }
 
-  function disconnect(): void {
-    isManualDisconnect = true
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer)
-      reconnectTimer = null
+    onUnmounted(() => {
+        disconnect()
+    })
+
+    return {
+        connect,
+        disconnect,
+        isConnected,
     }
-    if (eventSource) {
-      eventSource.close()
-      eventSource = null
-    }
-    isConnected.value = false
-    currentSessionId = null
-  }
-
-  onUnmounted(() => {
-    disconnect()
-  })
-
-  return {
-    connect,
-    disconnect,
-    isConnected,
-  }
 }

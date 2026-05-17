@@ -18,6 +18,11 @@ function appendPack(): void {
   packagerStore.appendPack(cartStore.items)
   cartStore.closeSidebar()
 }
+
+function goToPackage(): void {
+  cartStore.closeSidebar()
+  router.push({ name: "package" })
+}
 </script>
 
 <template>
@@ -116,7 +121,7 @@ function appendPack(): void {
         </div>
       </div>
 
-      <div class="border-t border-gray-200 p-4">
+      <div class="border-t border-gray-200 p-4 flex flex-col gap-2">
         <button
           v-if="!packagerStore.isPacking"
           data-testid="start-pack-btn"
@@ -129,18 +134,26 @@ function appendPack(): void {
         >
           开始打包
         </button>
-        <button
-          v-else
-          data-testid="append-pack-btn"
-          class="w-full py-2.5 rounded-lg text-white font-medium transition-colors"
-          :class="cartStore.isEmpty
-            ? 'bg-gray-300 cursor-not-allowed'
-            : 'bg-blue-600 hover:bg-blue-700'"
-          :disabled="cartStore.isEmpty"
-          @click="appendPack"
-        >
-          追加到打包
-        </button>
+        <template v-else>
+          <button
+            data-testid="append-pack-btn"
+            class="w-full py-2.5 rounded-lg text-white font-medium transition-colors"
+            :class="cartStore.isEmpty
+              ? 'bg-gray-300 cursor-not-allowed'
+              : 'bg-blue-600 hover:bg-blue-700'"
+            :disabled="cartStore.isEmpty"
+            @click="appendPack"
+          >
+            追加到打包
+          </button>
+          <button
+            data-testid="view-pack-btn"
+            class="w-full py-2.5 rounded-lg text-blue-600 font-medium transition-colors border border-blue-300 hover:bg-blue-50"
+            @click="goToPackage"
+          >
+            查看打包
+          </button>
+        </template>
       </div>
     </div>
   </div>

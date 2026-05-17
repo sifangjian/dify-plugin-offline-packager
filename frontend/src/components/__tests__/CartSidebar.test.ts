@@ -219,4 +219,37 @@ describe("CartSidebar", () => {
     const appendBtn = wrapper.find("[data-testid='append-pack-btn']")
     expect(appendBtn.attributes("disabled")).toBeDefined()
   })
+
+  it("should show view-pack button when isPacking is true", () => {
+    mockIsPacking = true
+    const cartStore = useCartStore()
+    cartStore.addItem(createMockPlugin())
+
+    const wrapper = mount(CartSidebar, { global: { plugins: [router] } })
+    expect(wrapper.find("[data-testid='view-pack-btn']").exists()).toBe(true)
+  })
+
+  it("should not show view-pack button when isPacking is false", () => {
+    mockIsPacking = false
+    const cartStore = useCartStore()
+    cartStore.addItem(createMockPlugin())
+
+    const wrapper = mount(CartSidebar, { global: { plugins: [router] } })
+    expect(wrapper.find("[data-testid='view-pack-btn']").exists()).toBe(false)
+  })
+
+  it("should close sidebar and navigate to /package when view-pack is clicked", async () => {
+    mockIsPacking = true
+    const cartStore = useCartStore()
+    cartStore.addItem(createMockPlugin())
+
+    const wrapper = mount(CartSidebar, { global: { plugins: [router] } })
+    const viewBtn = wrapper.find("[data-testid='view-pack-btn']")
+    await viewBtn.trigger("click")
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(cartStore.isOpen).toBe(false)
+    expect(router.currentRoute.value.path).toBe("/package")
+  })
 })

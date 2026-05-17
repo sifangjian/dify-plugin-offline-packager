@@ -499,11 +499,7 @@ class TestStepPackage:
         (plugin_dir / "requirements.txt").write_text("flask==2.0\n")
         (plugin_dir / "pyproject.toml").write_text("[project]\nname='test'\n")
 
-        mock_proc = AsyncMock()
-        mock_proc.communicate = AsyncMock(return_value=(b"", b""))
-        mock_proc.returncode = 0
-
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch.object(packager, "_run_subprocess_with_progress", return_value=(0, b"")):
             await packager._step_package(task)
 
         assert task.current_step == PackStep.PACKAGING
@@ -517,11 +513,7 @@ class TestStepPackage:
         (plugin_dir / "requirements.txt").write_text("flask==2.0\n")
         (plugin_dir / "pyproject.toml").write_text("[project]\nname='test'\n")
 
-        mock_proc = AsyncMock()
-        mock_proc.communicate = AsyncMock(return_value=(b"", b""))
-        mock_proc.returncode = 0
-
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch.object(packager, "_run_subprocess_with_progress", return_value=(0, b"")):
             await packager._step_package(task)
 
         content = (plugin_dir / "requirements.txt").read_text()
@@ -536,11 +528,7 @@ class TestStepPackage:
         (plugin_dir / "requirements.txt").write_text("flask==2.0\n")
         (plugin_dir / "pyproject.toml").write_text("[project]\nname='test'\n")
 
-        mock_proc = AsyncMock()
-        mock_proc.communicate = AsyncMock(return_value=(b"", b""))
-        mock_proc.returncode = 0
-
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch.object(packager, "_run_subprocess_with_progress", return_value=(0, b"")):
             await packager._step_package(task)
 
         content = (plugin_dir / "pyproject.toml").read_text()
@@ -556,11 +544,7 @@ class TestStepPackage:
         (plugin_dir / "requirements.txt").write_text("flask==2.0\n")
         (plugin_dir / "pyproject.toml").write_text("[project]\nname='test'\n[tool.uv]\nno-index = true\n")
 
-        mock_proc = AsyncMock()
-        mock_proc.communicate = AsyncMock(return_value=(b"", b""))
-        mock_proc.returncode = 0
-
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch.object(packager, "_run_subprocess_with_progress", return_value=(0, b"")):
             await packager._step_package(task)
 
         content = (plugin_dir / "pyproject.toml").read_text()
@@ -574,15 +558,11 @@ class TestStepPackage:
         plugin_dir = storage.get_plugin_dir(task.task_id)
         (plugin_dir / "requirements.txt").write_text("flask==2.0\n")
 
-        mock_proc = AsyncMock()
-        mock_proc.communicate = AsyncMock(return_value=(b"", b""))
-        mock_proc.returncode = 0
-
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+        with patch.object(packager, "_run_subprocess_with_progress", return_value=(0, b"")) as mock_run:
             await packager._step_package(task)
 
-        call_args = mock_exec.call_args
-        cmd = call_args[0]
+        call_args = mock_run.call_args
+        cmd = call_args[0][1]
         assert cmd[0] == packager._settings.DIFY_PLUGIN_CLI_PATH
         assert cmd[1] == "plugin"
         assert cmd[2] == "package"
@@ -595,11 +575,7 @@ class TestStepPackage:
         plugin_dir = storage.get_plugin_dir(task.task_id)
         (plugin_dir / "requirements.txt").write_text("flask==2.0\n")
 
-        mock_proc = AsyncMock()
-        mock_proc.communicate = AsyncMock(return_value=(b"", b""))
-        mock_proc.returncode = 0
-
-        with patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch.object(packager, "_run_subprocess_with_progress", return_value=(0, b"")):
             await packager._step_package(task)
 
         assert task.result_file_path is not None

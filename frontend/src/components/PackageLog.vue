@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from "vue"
+import { ref, computed, watch, nextTick } from "vue"
 import { usePackagerStore } from "@/stores/packager"
-import type { PackTaskProgress } from "@/types/packager"
+import type { PackTaskProgress, PackStep } from "@/types/packager"
 import { STEP_ORDER } from "@/types/packager"
 
 interface Props {
@@ -11,6 +11,15 @@ const props = defineProps<Props>()
 
 const packagerStore = usePackagerStore()
 const isLogExpanded = ref(false)
+const logContainer = ref<HTMLElement | null>(null)
+const isAutoScroll = ref(true)
+
+const STEP_SHORT_LABELS: Record<PackStep, string> = {
+  downloading: "下载",
+  resolving_deps: "解析",
+  downloading_deps: "依赖",
+  packaging: "打包",
+}
 
 const statusConfig = computed(() => {
   const configs: Record<string, { bg: string; border: string; badge: string; label: string }> = {
@@ -35,6 +44,27 @@ const stepIndicator = computed(() => {
   return `${current}/${total}`
 })
 
+const progressLabel = computed(() => {
+  if (!props.task.progress) return null
+  return `${props.task.progress.current}/${props.task.progress.total}`
+})
+
+function getStepState(index: number): "completed" | "current" | "pending" | "failed" {
+  if (props.task.status === "success") return "completed"
+  if (props.task.status === "failed") {
+    if (index < currentStepIndex.value) return "completed"
+    if (index === currentStepIndex.value) return "failed"
+    return "pending"
+  }
+  if (props.task.status === "cancelled") {
+    if (index < currentStepIndex.value) return "completed"
+    return "pending"
+  }
+  if (index < currentStepIndex.value) return "completed"
+  if (index === currentStepIndex.value) return "current"
+  return "pending"
+}
+
 const downloadButtonLabel = computed(() =>
   props.task.downloaded ? "重新下载" : "下载"
 )
@@ -54,6 +84,36 @@ function download(): void {
 function retry(): void {
   packagerStore.retryFailed(props.task.taskId)
 }
+
+function scrollToBottom(): void {
+  if (!logContainer.value || !isAutoScroll.value) return
+  nextTick(() => {
+    if (logContainer.value) {
+      logContainer.value.scrollTop = logContainer.value.scrollHeight
+    }
+  })
+}
+
+function onLogScroll(): void {
+  if (!logContainer.value) return
+  const { scrollTop, scrollHeight, clientHeight } = logContainer.value
+  isAutoScroll.value = scrollHeight - scrollTop - clientHeight < 30
+}
+
+watch(() => props.task.status, (newStatus) => {
+  if (newStatus === "running") {
+    isLogExpanded.value = true
+    isAutoScroll.value = true
+  } else {
+    isAutoScroll.value = false
+  }
+}, { immediate: true })
+
+watch(() => props.task.logs.length, () => {
+  if (props.task.status === "running") {
+    scrollToBottom()
+  }
+})
 </script>
 
 <template>
@@ -75,16 +135,66 @@ function retry(): void {
     </div>
 
     <div
-      v-if="task.status === 'running' && stepIndicator"
-      class="mt-2 text-sm text-blue-700"
+      v-if="task.status === 'running' || task.status === 'success' || task.status === 'failed' || task.status === 'cancelled'"
+      class="mt-3"
     >
-      步骤 {{ stepIndicator }}：{{ task.stepMessage }}
-      <span
-        v-if="task.stepDetail"
-        class="block text-xs text-blue-500 mt-1"
+      <div class="flex items-center">
+        <template v-for="(step, index) in STEP_ORDER" :key="step">
+          <div class="flex flex-col items-center">
+            <div
+              :class="[
+                'w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all duration-300',
+                {
+                  'bg-green-500 text-white': getStepState(index) === 'completed',
+                  'bg-blue-500 text-white animate-pulse': getStepState(index) === 'current',
+                  'bg-gray-200 text-gray-400': getStepState(index) === 'pending',
+                  'bg-red-500 text-white': getStepState(index) === 'failed',
+                }
+              ]"
+            >
+              <svg v-if="getStepState(index) === 'completed'" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <svg v-else-if="getStepState(index) === 'failed'" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span v-else>{{ index + 1 }}</span>
+            </div>
+            <span
+              :class="[
+                'text-[10px] mt-1 whitespace-nowrap',
+                {
+                  'text-green-600 font-medium': getStepState(index) === 'completed',
+                  'text-blue-600 font-medium': getStepState(index) === 'current',
+                  'text-gray-400': getStepState(index) === 'pending',
+                  'text-red-600 font-medium': getStepState(index) === 'failed',
+                }
+              ]"
+            >
+              {{ STEP_SHORT_LABELS[step] }}
+            </span>
+          </div>
+          <div
+            v-if="index < STEP_ORDER.length - 1"
+            :class="[
+              'flex-1 h-0.5 mx-1 mt-[-12px] transition-colors duration-300',
+              getStepState(index) === 'completed' ? 'bg-green-400' : 'bg-gray-200'
+            ]"
+          />
+        </template>
+      </div>
+      <div
+        v-if="task.status === 'running' && stepIndicator"
+        class="mt-2 text-sm text-blue-700 flex items-center gap-2"
       >
-        {{ task.stepDetail }}
-      </span>
+        <span>步骤 {{ stepIndicator }}：{{ task.stepMessage }}</span>
+        <span
+          v-if="progressLabel"
+          class="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-mono"
+        >
+          {{ progressLabel }}
+        </span>
+      </div>
     </div>
 
     <div
@@ -125,7 +235,9 @@ function retry(): void {
 
     <div
       v-if="isLogExpanded"
-      class="mt-3 rounded bg-white border border-gray-200 p-3 max-h-48 overflow-y-auto"
+      ref="logContainer"
+      class="mt-3 rounded bg-white border border-gray-200 p-3 max-h-64 overflow-y-auto"
+      @scroll="onLogScroll"
     >
       <div
         v-for="(log, index) in task.logs"
