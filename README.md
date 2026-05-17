@@ -19,7 +19,8 @@ docker run -p 8080:8080 dify-plugin-offline-packager
 
 ```bash
 uv sync
-uv run uvicorn backend.app.main:app --reload --port 8080
+cd backend
+uv run uvicorn app.main:app --reload --port 8080
 ```
 
 **前端**：
@@ -30,7 +31,7 @@ npm install
 npm run dev
 ```
 
-前端开发服务器运行在 `http://localhost:3000`，自动代理 API 请求到后端。
+前端开发服务器运行在 `http://localhost:3000`，自动代理 API 请求到后端 `http://localhost:8080`。
 
 ## 环境变量
 
