@@ -14,6 +14,11 @@ const router = createRouter({
       component: () => import("@/views/UploadView.vue"),
     },
     {
+      path: "/plugin/:author/:name",
+      name: "plugin-detail",
+      component: () => import("@/views/PluginDetailView.vue"),
+    },
+    {
       path: "/package",
       name: "package",
       component: () => import("@/views/PackageView.vue"),

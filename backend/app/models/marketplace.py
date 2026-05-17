@@ -23,7 +23,6 @@ class PluginInfo(BaseModel):
     name: str
     org: str
     plugin_id: str
-    icon: str = ""
     label: I18nText = I18nText()
     brief: I18nText = I18nText()
     introduction: str = ""
@@ -36,7 +35,7 @@ class PluginInfo(BaseModel):
     status: str = ""
     tags: list[PluginTag] = []
     verification: PluginVerification | None = None
-    badges: list[dict] = []
+    badges: list[dict | str] = []
     repository: str | None = None
     resource: PluginResource | None = None
     privacy_policy: str = ""

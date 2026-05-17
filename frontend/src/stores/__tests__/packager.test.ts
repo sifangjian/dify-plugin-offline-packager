@@ -35,7 +35,6 @@ function createMockPlugin(overrides: Partial<Plugin> = {}): Plugin {
     name: "google-search",
     org: "langgenius",
     plugin_id: "langgenius/google-search",
-    icon: "",
     label: { en_US: "Google Search", zh_Hans: "谷歌搜索" },
     brief: { en_US: "Search", zh_Hans: "搜索" },
     introduction: "",

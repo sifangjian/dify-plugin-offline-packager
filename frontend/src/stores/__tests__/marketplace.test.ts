@@ -18,7 +18,6 @@ function createMockPlugin(overrides: Partial<Plugin> = {}): Plugin {
     name: "test-plugin",
     org: "langgenius",
     plugin_id: "langgenius/test-plugin",
-    icon: "",
     label: { en_US: "Test Plugin", zh_Hans: "测试插件" },
     brief: { en_US: "A test plugin", zh_Hans: "一个测试插件" },
     introduction: "",
@@ -85,7 +84,7 @@ describe("useMarketplaceStore", () => {
         category: "",
         page: 1,
         page_size: 20,
-      })
+      }, expect.any(AbortSignal))
       expect(store.plugins).toEqual(mockResult.plugins)
       expect(store.total).toBe(1)
       expect(store.isLoading).toBe(false)
@@ -108,7 +107,7 @@ describe("useMarketplaceStore", () => {
         category: "",
         page: 1,
         page_size: 20,
-      })
+      }, expect.any(AbortSignal))
     })
 
     it("should clear plugins and set isLoading before search", async () => {
@@ -202,7 +201,7 @@ describe("useMarketplaceStore", () => {
         category: "tool",
         page: 1,
         page_size: 20,
-      })
+      }, expect.any(AbortSignal))
     })
 
     it("should clearCategory and auto-trigger search", async () => {
@@ -219,7 +218,7 @@ describe("useMarketplaceStore", () => {
         category: "",
         page: 1,
         page_size: 20,
-      })
+      }, expect.any(AbortSignal))
     })
 
     it("should search with keyword + category combination", async () => {
@@ -235,7 +234,7 @@ describe("useMarketplaceStore", () => {
         category: "tool",
         page: 1,
         page_size: 20,
-      })
+      }, expect.any(AbortSignal))
     })
 
     it("should search all plugins with empty keyword and category", async () => {
@@ -249,7 +248,7 @@ describe("useMarketplaceStore", () => {
         category: "",
         page: 1,
         page_size: 20,
-      })
+      }, expect.any(AbortSignal))
     })
 
     it("should browse category plugins with empty keyword", async () => {
@@ -264,7 +263,7 @@ describe("useMarketplaceStore", () => {
         category: "model",
         page: 1,
         page_size: 20,
-      })
+      }, expect.any(AbortSignal))
     })
   })
 
@@ -320,7 +319,7 @@ describe("useMarketplaceStore", () => {
         category: "",
         page: 2,
         page_size: 20,
-      })
+      }, expect.any(AbortSignal))
     })
 
     it("should set error when loadMore fails", async () => {

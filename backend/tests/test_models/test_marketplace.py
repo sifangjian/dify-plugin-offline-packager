@@ -75,7 +75,6 @@ class TestPluginInfo:
             org="langgenius",
             plugin_id="langgenius/agent",
         )
-        assert plugin.icon == ""
         assert plugin.label == I18nText()
         assert plugin.brief == I18nText()
         assert plugin.introduction == ""
@@ -95,7 +94,6 @@ class TestPluginInfo:
             name="agent",
             org="langgenius",
             plugin_id="langgenius/agent",
-            icon="https://example.com/icon.png",
             label=I18nText(en_US="Agent", zh_Hans="智能体"),
             brief=I18nText(en_US="An agent plugin", zh_Hans="智能体插件"),
             introduction="This is an agent plugin",
@@ -113,7 +111,6 @@ class TestPluginInfo:
             resource=PluginResource(memory=512),
             privacy_policy="https://example.com/privacy",
         )
-        assert plugin.icon == "https://example.com/icon.png"
         assert plugin.label.en_US == "Agent"
         assert plugin.brief.zh_Hans == "智能体插件"
         assert plugin.install_count == 1000

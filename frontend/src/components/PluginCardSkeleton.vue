@@ -1,7 +1,6 @@
 <template>
   <div class="bg-white rounded-lg border p-4 animate-pulse">
     <div class="flex items-start gap-3">
-      <div class="w-10 h-10 bg-gray-200 rounded" />
       <div class="flex-1">
         <div class="h-4 bg-gray-200 rounded w-3/4" />
         <div class="h-3 bg-gray-200 rounded w-1/2 mt-2" />

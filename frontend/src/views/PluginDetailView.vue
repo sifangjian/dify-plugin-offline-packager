@@ -58,11 +58,6 @@
     >
       <div class="bg-white rounded-lg border p-6">
         <div class="flex items-start gap-4">
-          <img
-            :src="plugin.icon || '/default-icon.svg'"
-            class="w-16 h-16 rounded-lg"
-            :alt="getI18nText(plugin.label)"
-          >
           <div class="flex-1 min-w-0">
             <h2 class="text-xl font-semibold">
               {{ getI18nText(plugin.label) }}

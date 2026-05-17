@@ -19,7 +19,6 @@ function createMockPlugin(overrides: Partial<Plugin> = {}): Plugin {
     name: "test-plugin",
     org: "langgenius",
     plugin_id: "langgenius/test-plugin",
-    icon: "",
     label: { en_US: "Test Plugin", zh_Hans: "测试插件" },
     brief: { en_US: "A test plugin", zh_Hans: "一个测试插件" },
     introduction: "",

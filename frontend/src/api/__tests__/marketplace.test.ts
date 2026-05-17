@@ -33,7 +33,8 @@ describe("Marketplace API", () => {
 
       expect(mockPost).toHaveBeenCalledWith(
         "/v1/marketplace/search",
-        params
+        params,
+        { signal: undefined }
       )
     })
   })

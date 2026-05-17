@@ -8,10 +8,11 @@ import type {
   BatchResult,
 } from "@/types/marketplace"
 
-export async function searchPlugins(params: SearchParams): Promise<SearchResult> {
+export async function searchPlugins(params: SearchParams, signal?: AbortSignal): Promise<SearchResult> {
   const response = await apiClient.post<SearchResult>(
     "/v1/marketplace/search",
-    params
+    params,
+    { signal }
   )
   return response.data
 }

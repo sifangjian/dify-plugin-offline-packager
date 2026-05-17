@@ -16,7 +16,6 @@ export interface Plugin {
   name: string
   org: string
   plugin_id: string
-  icon: string
   label: I18nText
   brief: I18nText
   introduction: string
@@ -29,7 +28,7 @@ export interface Plugin {
   status: string
   tags: string[]
   verification: PluginVerification | null
-  badges: Record<string, unknown>[]
+  badges: (Record<string, unknown> | string)[]
   repository: string | null
   resource: PluginResource | null
   privacy_policy: string

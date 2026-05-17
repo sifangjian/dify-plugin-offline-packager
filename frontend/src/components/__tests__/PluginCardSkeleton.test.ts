@@ -8,12 +8,6 @@ describe("PluginCardSkeleton", () => {
     expect(wrapper.find(".animate-pulse").exists()).toBe(true)
   })
 
-  it("should render icon placeholder with w-10 h-10 rounded", () => {
-    const wrapper = mount(PluginCardSkeleton)
-    const icon = wrapper.find(".animate-pulse .w-10.h-10.rounded")
-    expect(icon.exists()).toBe(true)
-  })
-
   it("should render title placeholder with h-4 w-3/4", () => {
     const wrapper = mount(PluginCardSkeleton)
     const title = wrapper.find(".animate-pulse .h-4.w-3\\/4")

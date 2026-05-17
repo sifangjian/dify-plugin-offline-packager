@@ -10,7 +10,6 @@ function createMockPlugin(overrides: Partial<Plugin> = {}): Plugin {
     name: "google-search",
     org: "langgenius",
     plugin_id: "langgenius/google-search",
-    icon: "https://example.com/icon.png",
     label: { en_US: "Google Search", zh_Hans: "谷歌搜索" },
     brief: { en_US: "Search with Google", zh_Hans: "使用谷歌搜索" },
     introduction: "",
@@ -88,22 +87,6 @@ describe("PluginCard", () => {
     const plugin = createMockPlugin({ install_count: 500 })
     const wrapper = mount(PluginCard, { props: { plugin } })
     expect(wrapper.text()).toContain("500")
-  })
-
-  it("should display icon when provided", () => {
-    const plugin = createMockPlugin({ icon: "https://example.com/icon.png" })
-    const wrapper = mount(PluginCard, { props: { plugin } })
-    const img = wrapper.find("img")
-    expect(img.exists()).toBe(true)
-    expect(img.attributes("src")).toBe("https://example.com/icon.png")
-  })
-
-  it("should display default placeholder when icon is empty", () => {
-    const plugin = createMockPlugin({ icon: "" })
-    const wrapper = mount(PluginCard, { props: { plugin } })
-    const img = wrapper.find("img")
-    expect(img.exists()).toBe(true)
-    expect(img.attributes("src")).toBe("/default-icon.svg")
   })
 
   it("should show add button when plugin is not in cart", () => {

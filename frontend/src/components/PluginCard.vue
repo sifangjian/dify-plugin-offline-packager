@@ -1,11 +1,9 @@
 <template>
-  <div class="bg-white rounded-lg border p-4 hover:shadow-md transition-shadow">
+  <div
+    class="bg-white rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer"
+    @click="goToDetail"
+  >
     <div class="flex items-start gap-3">
-      <img
-        :src="plugin.icon || '/default-icon.svg'"
-        class="w-10 h-10 rounded"
-        :alt="getI18nText(plugin.label)"
-      >
       <div class="min-w-0 flex-1">
         <h3 class="font-medium truncate">
           {{ getI18nText(plugin.label) }}
@@ -33,7 +31,7 @@
           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
           : 'bg-blue-500 text-white hover:bg-blue-600'"
         class="px-3 py-1 text-sm rounded-lg transition-colors"
-        @click="cartStore.addItem(plugin)"
+        @click.stop="cartStore.addItem(plugin)"
       >
         {{ cartStore.hasItem(plugin.plugin_id) ? '已添加' : '添加' }}
       </button>
@@ -42,15 +40,21 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from "vue-router"
 import type { Plugin } from "@/types/marketplace"
 import { useCartStore } from "@/stores/cart"
 
+const router = useRouter()
 const cartStore = useCartStore()
 
 interface Props {
   plugin: Plugin
 }
-defineProps<Props>()
+const props = defineProps<Props>()
+
+function goToDetail() {
+  router.push({ name: "plugin-detail", params: { author: props.plugin.org, name: props.plugin.name } })
+}
 
 function getI18nText(text: { zh_Hans: string; en_US: string }): string {
   return text.zh_Hans || text.en_US

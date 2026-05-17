@@ -11,7 +11,6 @@ function createMockPlugin(overrides: Partial<Plugin> = {}): Plugin {
     name: "test-plugin",
     org: "test",
     plugin_id: "test/test-plugin",
-    icon: "https://example.com/icon.png",
     label: { en_US: "Test Plugin", zh_Hans: "测试插件" },
     brief: { en_US: "A test plugin", zh_Hans: "一个测试插件" },
     introduction: "",
@@ -38,13 +37,9 @@ describe("CartItem", () => {
     setActivePinia(createPinia())
   })
 
-  it("should display icon, name, author, version, category, and remove button", () => {
+  it("should display name, author, version, category, and remove button", () => {
     const plugin = createMockPlugin()
     const wrapper = mount(CartItem, { props: { plugin } })
-
-    const img = wrapper.find("img")
-    expect(img.exists()).toBe(true)
-    expect(img.attributes("src")).toBe("https://example.com/icon.png")
 
     expect(wrapper.text()).toContain("测试插件")
     expect(wrapper.text()).toContain("test")
@@ -61,15 +56,6 @@ describe("CartItem", () => {
     })
     const wrapper = mount(CartItem, { props: { plugin } })
     expect(wrapper.text()).toContain("Test Plugin")
-  })
-
-  it("should display default placeholder when icon is empty", () => {
-    const plugin = createMockPlugin({ icon: "" })
-    const wrapper = mount(CartItem, { props: { plugin } })
-    const img = wrapper.find("img")
-    expect(img.exists()).toBe(false)
-    const placeholder = wrapper.find("[data-testid='default-icon']")
-    expect(placeholder.exists()).toBe(true)
   })
 
   it("should not display category tag when category is empty", () => {
