@@ -46,7 +46,11 @@ async def lifespan(app):
     httpx_client = httpx.AsyncClient(timeout=30.0)
 
     work_dir = Path(settings.WORK_DIR)
-    work_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        work_dir.mkdir(parents=True, exist_ok=True)
+    except PermissionError:
+        work_dir = Path("./workspace")
+        work_dir.mkdir(parents=True, exist_ok=True)
     storage = StorageService(work_dir=work_dir)
 
     packager = PackagerService(

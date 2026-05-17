@@ -39,13 +39,12 @@ class SSEEventType(StrEnum):
     TASK_FAILED = "task_failed"
     SESSION_COMPLETED = "session_completed"
 
-
-STEP_MESSAGES: dict[PackStep, str] = {
-    """
+"""
     步骤消息映射
 
     为每个打包步骤提供用户友好的中文描述消息。
-    """
+"""
+STEP_MESSAGES: dict[PackStep, str] = {
     PackStep.DOWNLOADING: "正在下载插件包...",
     PackStep.RESOLVING_DEPS: "正在解析依赖...",
     PackStep.DOWNLOADING_DEPS: "正在下载依赖包...",
