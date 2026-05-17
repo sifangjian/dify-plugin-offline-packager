@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 MARKETPLACE_BASE_URL = "https://marketplace.dify.ai"
-SEARCH_URL = f"{MARKETPLACE_BASE_URL}/api/v1/plugins/search/basic"
+SEARCH_URL = f"{MARKETPLACE_BASE_URL}/api/v1/plugins/search/advanced"
 BATCH_URL = f"{MARKETPLACE_BASE_URL}/api/v1/plugins/batch"
 DOWNLOAD_URL = f"{MARKETPLACE_BASE_URL}/api/v1/plugins/langgenius/agent/0.0.1/download"
 

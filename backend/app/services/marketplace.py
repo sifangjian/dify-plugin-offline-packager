@@ -33,8 +33,8 @@ class MarketplaceService:
     async def search_plugins(self, keyword: str, category: str, page: int, page_size: int) -> SearchResponse:
         data = await self._request(
             "POST",
-            "/api/v1/plugins/search/basic",
-            json={"keyword": keyword, "category": category, "page": page, "page_size": page_size},
+            "/api/v1/plugins/search/advanced",
+            json={"query": keyword, "category": category, "page": page, "page_size": page_size},
         )
         plugins = [PluginInfo(**p) for p in data.get("plugins", [])]
         return SearchResponse(plugins=plugins, total=data.get("total", 0))

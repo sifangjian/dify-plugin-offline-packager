@@ -9,7 +9,7 @@ from app.models.marketplace import BatchResponse, SearchResponse
 from app.services.marketplace import MarketplaceService
 
 BASE_URL = "https://marketplace.dify.ai"
-SEARCH_URL = f"{BASE_URL}/api/v1/plugins/search/basic"
+SEARCH_URL = f"{BASE_URL}/api/v1/plugins/search/advanced"
 BATCH_URL = f"{BASE_URL}/api/v1/plugins/batch"
 DOWNLOAD_URL = f"{BASE_URL}/api/v1/plugins/langgenius/agent/0.0.1/download"
 
@@ -97,7 +97,7 @@ class TestSearchPlugins:
         assert route.called
         request = route.calls.last.request
         body = json.loads(request.content)
-        assert body["keyword"] == "test"
+        assert body["query"] == "test"
         assert body["category"] == "agent"
         assert body["page"] == 2
         assert body["page_size"] == 10
