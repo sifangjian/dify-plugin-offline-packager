@@ -18,6 +18,7 @@
 import asyncio
 import contextlib
 import os
+import sys
 import time
 import uuid
 import zipfile
@@ -275,15 +276,40 @@ class PackagerService:
         stderr_lines: list[str] = []
 
         async def read_stream(stream, lines: list[str], is_stderr: bool):
+            buf = b""
             while True:
-                line = await stream.readline()
-                if not line:
+                chunk = await stream.read(1024)
+                if not chunk:
+                    if buf:
+                        line_str = buf.decode(errors="replace").strip()
+                        if line_str:
+                            lines.append(line_str)
+                            print(f"[{'stderr' if is_stderr else 'stdout'}] {line_str}")
+                            if progress_callback:
+                                progress_callback(line_str)
                     break
-                line_str = line.decode().strip()
-                lines.append(line_str)
-                print(f"[{'stderr' if is_stderr else 'stdout'}] {line_str}")
-                if progress_callback:
-                    progress_callback(line_str)
+                buf += chunk
+                while b"\n" in buf:
+                    line_bytes, buf = buf.split(b"\n", 1)
+                    line_str = line_bytes.decode(errors="replace").strip()
+                    if line_str:
+                        lines.append(line_str)
+                        print(f"[{'stderr' if is_stderr else 'stdout'}] {line_str}")
+                        if progress_callback:
+                            progress_callback(line_str)
+                if b"\r" in buf:
+                    parts = buf.split(b"\r")
+                    last_part = parts[-1]
+                    line_str = last_part.decode(errors="replace").strip()
+                    if line_str and line_str != (lines[-1] if lines else ""):
+                        if lines and not lines[-1].endswith(line_str):
+                            lines[-1] = line_str
+                        else:
+                            lines.append(line_str)
+                        print(f"[{'stderr' if is_stderr else 'stdout'}] {line_str}")
+                        if progress_callback:
+                            progress_callback(line_str)
+                    buf = last_part
 
         try:
             await asyncio.gather(
@@ -543,8 +569,12 @@ class PackagerService:
                         raw_error=stderr.decode(),
                     )
                 (plugin_dir / "requirements.txt").write_bytes(stdout)
-            except RuntimeError:
-                return
+            except RuntimeError as e:
+                raise PackageStepError(
+                    step=PackStep.RESOLVING_DEPS,
+                    message="解析依赖失败",
+                    raw_error=str(e),
+                ) from None
             except PackageStepError:
                 raise
             except Exception as e:
@@ -594,6 +624,31 @@ class PackagerService:
         pip_mirror_url = self._settings.PIP_MIRROR_URL
         trusted_host = pip_mirror_url.split("//")[1].split("/")[0]
 
+        pip_cmd = [
+            sys.executable,
+            "-m",
+            "pip",
+            "download",
+            "--prefer-binary",
+            "--timeout", "120",
+            "--retries", "3",
+            "-r",
+            str(plugin_dir / "requirements.txt"),
+            "-d",
+            str(wheels_dir),
+            "--index-url",
+            pip_mirror_url,
+            "--trusted-host",
+            trusted_host,
+        ]
+        print(f"[pip download] Command: {' '.join(pip_cmd)}")
+        print(f"[pip download] Python: {sys.executable}")
+        print(f"[pip download] Mirror: {pip_mirror_url}")
+        print(f"[pip download] Requirements file: {req_file}")
+        print(f"[pip download] Total deps: {total_deps}")
+        if req_file.exists():
+            print(f"[pip download] Requirements content:\n{req_file.read_text()}")
+
         processed_count = 0
         last_emit_time = 0.0
         throttle_interval = 0.2
@@ -638,8 +693,24 @@ class PackagerService:
                         detail = f"已保存: {part}"
                         should_count = True
                         break
-
-            if detail is None:
+            else:
+                task.step_detail = line[:100]
+                task.updated_at = datetime.now()
+                now = time.monotonic()
+                if now - last_emit_time >= throttle_interval:
+                    last_emit_time = now
+                    self._emit_event(
+                        StepProgressEvent(
+                            session_id=task.session_id,
+                            task_id=task.task_id,
+                            plugin_name=task.name,
+                            step=PackStep.DOWNLOADING_DEPS,
+                            message=STEP_MESSAGES[PackStep.DOWNLOADING_DEPS],
+                            detail=line[:100],
+                            progress={"current": processed_count, "total": total_deps} if total_deps > 0 else None,
+                            timestamp=datetime.now(),
+                        )
+                    )
                 return
 
             if should_count:
@@ -677,21 +748,7 @@ class PackagerService:
             }
             returncode, stderr = await self._run_subprocess_with_progress(
                 task,
-                [
-                    "python3",
-                    "-m",
-                    "pip",
-                    "download",
-                    "--prefer-binary",
-                    "-r",
-                    str(plugin_dir / "requirements.txt"),
-                    "-d",
-                    str(wheels_dir),
-                    "--index-url",
-                    pip_mirror_url,
-                    "--trusted-host",
-                    trusted_host,
-                ],
+                pip_cmd,
                 cwd=str(plugin_dir),
                 progress_callback=on_progress,
                 env=pip_env,

@@ -38,7 +38,7 @@ class StorageService:
         Args:
             work_dir: 工作目录根路径，所有任务文件将存储在此目录下
         """
-        self._work_dir = work_dir
+        self._work_dir = work_dir.resolve()
 
     async def create_task_dirs(self, task_id: str) -> Path:
         """
