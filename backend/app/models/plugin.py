@@ -17,6 +17,13 @@ from pathlib import Path
 from pydantic import BaseModel, field_validator
 
 
+class Architecture(StrEnum):
+    LINUX_AMD64 = "linux-amd64"
+    LINUX_ARM64 = "linux-arm64"
+    DARWIN_AMD64 = "darwin-amd64"
+    DARWIN_ARM64 = "darwin-arm64"
+
+
 class PluginSource(StrEnum):
     """
     插件来源枚举
@@ -83,6 +90,7 @@ class PackPluginItem(BaseModel):
     name: str
     version: str
     source: PluginSource = PluginSource.MARKETPLACE
+    architecture: Architecture = Architecture.LINUX_AMD64
 
 
 class PackRequest(BaseModel):
@@ -182,6 +190,7 @@ class PackTaskInfo(BaseModel):
     name: str
     version: str
     source: PluginSource
+    architecture: Architecture = Architecture.LINUX_AMD64
     local_file_path: Path | None = None
     status: TaskStatus = TaskStatus.PENDING
     current_step: PackStep | None = None

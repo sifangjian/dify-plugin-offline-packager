@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import type {
+  Architecture,
   PackStep,
   TaskStatus,
   PackRequest,
@@ -9,6 +10,7 @@ import type {
   StepLog,
 } from "@/types/packager"
 import {
+  ARCHITECTURE_OPTIONS,
   STEP_LABELS,
   STEP_ORDER,
 } from "@/types/packager"
@@ -266,6 +268,45 @@ describe("types/packager", () => {
       expect(response.session_id).toBe("s-1")
       expect(response.tasks).toHaveLength(1)
       expect(response.tasks[0].status).toBe("pending")
+    })
+  })
+
+  describe("Architecture type", () => {
+    it("should accept valid Architecture values", () => {
+      const architectures: Architecture[] = [
+        "linux-amd64",
+        "linux-arm64",
+        "darwin-amd64",
+        "darwin-arm64",
+      ]
+      expect(architectures).toHaveLength(4)
+    })
+  })
+
+  describe("ARCHITECTURE_OPTIONS", () => {
+    it("should contain 4 options", () => {
+      expect(ARCHITECTURE_OPTIONS).toHaveLength(4)
+    })
+
+    it("should have correct structure for each option", () => {
+      for (const option of ARCHITECTURE_OPTIONS) {
+        expect(option).toHaveProperty("value")
+        expect(option).toHaveProperty("label")
+        expect(option).toHaveProperty("description")
+      }
+    })
+
+    it("should have linux-amd64 as first option with correct values", () => {
+      expect(ARCHITECTURE_OPTIONS[0]).toEqual({
+        value: "linux-amd64",
+        label: "Linux x86_64",
+        description: "适用于 Linux x86_64 服务器",
+      })
+    })
+
+    it("should have unique values", () => {
+      const values = ARCHITECTURE_OPTIONS.map((o) => o.value)
+      expect(new Set(values).size).toBe(values.length)
     })
   })
 })

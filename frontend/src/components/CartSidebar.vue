@@ -1,14 +1,25 @@
 <script setup lang="ts">
+import { ref } from "vue"
 import { useRouter } from "vue-router"
 import { useCartStore } from "@/stores/cart"
 import { usePackagerStore } from "@/stores/packager"
 import CartItem from "@/components/CartItem.vue"
+import ArchitectureSelector from "@/components/ArchitectureSelector.vue"
 
 const router = useRouter()
 const cartStore = useCartStore()
 const packagerStore = usePackagerStore()
 
-async function startPack(): Promise<void> {
+const showArchSelector = ref(false)
+
+function onStartPack(): void {
+  if (cartStore.isEmpty) return
+  showArchSelector.value = true
+}
+
+async function onArchConfirm(architecture: string): Promise<void> {
+  showArchSelector.value = false
+  packagerStore.setArchitecture(architecture)
   await packagerStore.startPackFromCart(cartStore.items)
   cartStore.closeSidebar()
   router.push({ name: "package" })
@@ -130,7 +141,7 @@ function goToPackage(): void {
             ? 'bg-gray-300 cursor-not-allowed'
             : 'bg-blue-600 hover:bg-blue-700'"
           :disabled="cartStore.isEmpty"
-          @click="startPack"
+          @click="onStartPack"
         >
           开始打包
         </button>
@@ -156,5 +167,11 @@ function goToPackage(): void {
         </template>
       </div>
     </div>
+
+    <ArchitectureSelector
+      v-model="showArchSelector"
+      :selected-architecture="packagerStore.selectedArchitecture"
+      @confirm="onArchConfirm"
+    />
   </div>
 </template>

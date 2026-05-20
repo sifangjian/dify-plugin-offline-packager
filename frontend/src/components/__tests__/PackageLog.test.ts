@@ -21,6 +21,7 @@ function createTask(overrides: Partial<PackTaskProgress> = {}): PackTaskProgress
     author: "langgenius",
     name: "google-search",
     version: "1.0.0",
+    architecture: "linux-amd64",
     status: "pending",
     currentStep: null,
     stepMessage: null,
@@ -229,6 +230,40 @@ describe("PackageLog", () => {
       })
 
       expect(wrapper.find("[data-testid='retry-btn']").exists()).toBe(true)
+    })
+  })
+
+  describe("architecture display", () => {
+    it("should display architecture label for linux-amd64", () => {
+      const wrapper = mount(PackageLog, {
+        props: { task: createTask({ architecture: "linux-amd64" }) },
+      })
+
+      expect(wrapper.text()).toContain("Linux x86_64")
+    })
+
+    it("should display architecture label for linux-arm64", () => {
+      const wrapper = mount(PackageLog, {
+        props: { task: createTask({ architecture: "linux-arm64" }) },
+      })
+
+      expect(wrapper.text()).toContain("Linux ARM64")
+    })
+
+    it("should display architecture label for darwin-amd64", () => {
+      const wrapper = mount(PackageLog, {
+        props: { task: createTask({ architecture: "darwin-amd64" }) },
+      })
+
+      expect(wrapper.text()).toContain("macOS Intel")
+    })
+
+    it("should display architecture label for darwin-arm64", () => {
+      const wrapper = mount(PackageLog, {
+        props: { task: createTask({ architecture: "darwin-arm64" }) },
+      })
+
+      expect(wrapper.text()).toContain("macOS Apple Silicon")
     })
   })
 })

@@ -29,6 +29,7 @@ import httpx
 
 from app.core.config import Settings
 from app.models.plugin import (
+    Architecture,
     PackPluginItem,
     PackSessionInfo,
     PackStep,
@@ -47,6 +48,13 @@ from app.models.sse import (
 )
 from app.services.marketplace import MarketplaceService
 from app.services.storage import StorageService
+
+ARCHITECTURE_PLATFORM_MAP: dict[Architecture, str] = {
+    Architecture.LINUX_AMD64: "manylinux2014_x86_64",
+    Architecture.LINUX_ARM64: "manylinux2014_aarch64",
+    Architecture.DARWIN_AMD64: "macosx_10_9_x86_64",
+    Architecture.DARWIN_ARM64: "macosx_11_0_arm64",
+}
 
 
 class PackageStepError(Exception):
@@ -158,6 +166,7 @@ class PackagerService:
                 name=plugin.name,
                 version=plugin.version,
                 source=plugin.source,
+                architecture=plugin.architecture,
                 status=TaskStatus.PENDING,
                 created_at=now,
                 updated_at=now,
@@ -350,6 +359,7 @@ class PackagerService:
                 task_id=task.task_id,
                 plugin_name=task.name,
                 plugin_version=task.version,
+                architecture=task.architecture,
                 timestamp=datetime.now(),
             )
         )
@@ -622,25 +632,13 @@ class PackagerService:
         )
 
         pip_mirror_url = self._settings.PIP_MIRROR_URL
-        trusted_host = pip_mirror_url.split("//")[1].split("/")[0]
 
-        pip_cmd = [
-            sys.executable,
-            "-m",
-            "pip",
-            "download",
-            "--prefer-binary",
-            "--timeout", "120",
-            "--retries", "3",
-            "-r",
+        pip_cmd = self._build_pip_download_cmd(
+            task,
             str(plugin_dir / "requirements.txt"),
-            "-d",
             str(wheels_dir),
-            "--index-url",
             pip_mirror_url,
-            "--trusted-host",
-            trusted_host,
-        ]
+        )
         print(f"[pip download] Command: {' '.join(pip_cmd)}")
         print(f"[pip download] Python: {sys.executable}")
         print(f"[pip download] Mirror: {pip_mirror_url}")
@@ -835,7 +833,7 @@ class PackagerService:
             returncode, stderr = await self._run_subprocess_with_progress(
                 task,
                 [
-                    self._settings.DIFY_PLUGIN_CLI_PATH,
+                    self._get_cli_path(task),
                     "plugin",
                     "package",
                     str(plugin_dir),
@@ -865,6 +863,62 @@ class PackagerService:
 
         task.result_file_path = output_path
         task.updated_at = datetime.now()
+
+    def _build_pip_download_cmd(
+        self,
+        task: PackTaskInfo,
+        req_file_path: str,
+        wheels_dir: str,
+        pip_mirror_url: str,
+    ) -> list[str]:
+        trusted_host = pip_mirror_url.split("//")[1].split("/")[0]
+        platform = ARCHITECTURE_PLATFORM_MAP[task.architecture]
+        return [
+            sys.executable,
+            "-m",
+            "pip",
+            "download",
+            "--prefer-binary",
+            "--timeout", "120",
+            "--retries", "3",
+            "--platform", platform,
+            "--only-binary=:all:",
+            "-r", req_file_path,
+            "-d", wheels_dir,
+            "--index-url", pip_mirror_url,
+            "--trusted-host", trusted_host,
+        ]
+
+    def _get_cli_path(self, task: PackTaskInfo) -> str:
+        return self._settings.get_cli_path(task.architecture)
+
+    def _validate_cli_path(self, task: PackTaskInfo) -> None:
+        cli_path = self._get_cli_path(task)
+        from pathlib import Path
+        if not Path(cli_path).exists():
+            raise PackageStepError(
+                step=PackStep.PACKAGING,
+                message=f"CLI 工具不存在: {cli_path}",
+                raw_error=f"CLI tool not found at {cli_path}",
+            )
+
+    def _parse_pip_download_error(self, stderr: bytes, architecture: Architecture) -> None:
+        error_msg = stderr.decode()
+        if "No matching distribution found for" in error_msg:
+            import re
+            match = re.search(r"No matching distribution found for (\S+)", error_msg)
+            package_name = match.group(1) if match else "unknown"
+            arch_label = architecture.value
+            raise PackageStepError(
+                step=PackStep.DOWNLOADING_DEPS,
+                message=f"依赖包 {package_name} 不支持 {arch_label} 架构",
+                raw_error=error_msg,
+            )
+        raise PackageStepError(
+            step=PackStep.DOWNLOADING_DEPS,
+            message="下载依赖包失败",
+            raw_error=error_msg,
+        )
 
     def _check_session_completion(self, session_id: str) -> None:
         """

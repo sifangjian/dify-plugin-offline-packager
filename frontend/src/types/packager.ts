@@ -2,6 +2,21 @@ export type PackStep = "downloading" | "resolving_deps" | "downloading_deps" | "
 
 export type TaskStatus = "pending" | "running" | "success" | "failed" | "cancelled"
 
+export type Architecture = "linux-amd64" | "linux-arm64" | "darwin-amd64" | "darwin-arm64"
+
+export interface ArchitectureOption {
+  value: Architecture
+  label: string
+  description: string
+}
+
+export const ARCHITECTURE_OPTIONS: ArchitectureOption[] = [
+  { value: "linux-amd64", label: "Linux x86_64", description: "适用于 Linux x86_64 服务器" },
+  { value: "linux-arm64", label: "Linux ARM64", description: "适用于 Linux ARM64 服务器" },
+  { value: "darwin-amd64", label: "macOS Intel", description: "适用于 macOS Intel 电脑" },
+  { value: "darwin-arm64", label: "macOS Apple Silicon", description: "适用于 macOS Apple Silicon 电脑" },
+]
+
 export type SSEEventType =
   | "session_started"
   | "task_started"
@@ -15,6 +30,7 @@ export interface PackPluginItem {
   name: string
   version: string
   source: "marketplace" | "local"
+  architecture?: Architecture
 }
 
 export interface PackRequest {
@@ -50,6 +66,7 @@ export interface TaskStartedEvent extends SSEEventBase {
   task_id: string
   plugin_name: string
   plugin_version: string
+  architecture: Architecture
 }
 
 export interface StepProgressEvent extends SSEEventBase {
@@ -98,6 +115,7 @@ export interface PackTaskProgress {
   author: string
   name: string
   version: string
+  architecture: Architecture
   status: TaskStatus
   currentStep: PackStep | null
   stepMessage: string | null
@@ -129,3 +147,14 @@ export const STEP_ORDER: PackStep[] = [
   "downloading_deps",
   "packaging",
 ]
+
+export const ARCHITECTURE_LABELS: Record<Architecture, string> = {
+  "linux-amd64": "Linux x86_64",
+  "linux-arm64": "Linux ARM64",
+  "darwin-amd64": "macOS Intel",
+  "darwin-arm64": "macOS Apple Silicon",
+}
+
+export function getArchitectureLabel(architecture: Architecture): string {
+  return ARCHITECTURE_LABELS[architecture]
+}

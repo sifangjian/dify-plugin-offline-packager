@@ -2,7 +2,7 @@
 import { ref, computed, watch, nextTick } from "vue"
 import { usePackagerStore } from "@/stores/packager"
 import type { PackTaskProgress, PackStep } from "@/types/packager"
-import { STEP_ORDER } from "@/types/packager"
+import { STEP_ORDER, getArchitectureLabel } from "@/types/packager"
 
 interface Props {
   task: PackTaskProgress
@@ -126,6 +126,9 @@ watch(() => props.task.logs.length, () => {
           </div>
           <div class="text-sm text-gray-500">
             {{ task.author }} · v{{ task.version }}
+          </div>
+          <div class="text-xs text-gray-400 mt-0.5">
+            目标架构: {{ getArchitectureLabel(task.architecture) }}
           </div>
         </div>
       </div>

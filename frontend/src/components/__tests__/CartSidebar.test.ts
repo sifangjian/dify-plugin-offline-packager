@@ -8,12 +8,17 @@ import type { Plugin } from "@/types/marketplace"
 
 let mockIsPacking = false
 const mockAppendPack = vi.fn()
+const mockStartPackFromCart = vi.fn()
+const mockSetArchitecture = vi.fn()
+let mockSelectedArchitecture = "linux-amd64"
 
 vi.mock("@/stores/packager", () => ({
   usePackagerStore: () => ({
     isPacking: mockIsPacking,
     appendPack: mockAppendPack,
-    startPackFromCart: vi.fn(),
+    startPackFromCart: mockStartPackFromCart,
+    setArchitecture: mockSetArchitecture,
+    selectedArchitecture: mockSelectedArchitecture,
   }),
 }))
 
@@ -48,9 +53,13 @@ describe("CartSidebar", () => {
 
   beforeEach(async () => {
     sessionStorage.clear()
+    localStorage.clear()
     setActivePinia(createPinia())
     mockIsPacking = false
     mockAppendPack.mockReset()
+    mockStartPackFromCart.mockReset()
+    mockSetArchitecture.mockReset()
+    mockSelectedArchitecture = "linux-amd64"
 
     router = createRouter({
       history: createMemoryHistory(),
@@ -159,18 +168,49 @@ describe("CartSidebar", () => {
     expect(cartStore.isEmpty).toBe(true)
   })
 
-  it("should close sidebar and navigate to /package when start-pack is clicked", async () => {
+  it("should show architecture selector when start-pack is clicked with items in cart", async () => {
     const cartStore = useCartStore()
     cartStore.addItem(createMockPlugin())
 
     const wrapper = mount(CartSidebar, { global: { plugins: [router] } })
     const startBtn = wrapper.find("[data-testid='start-pack-btn']")
     await startBtn.trigger("click")
+
+    expect(wrapper.findComponent({ name: "ArchitectureSelector" }).exists()).toBe(true)
+  })
+
+  it("should start pack and navigate when architecture is confirmed", async () => {
+    const cartStore = useCartStore()
+    cartStore.addItem(createMockPlugin())
+
+    const wrapper = mount(CartSidebar, { global: { plugins: [router] } })
+    const startBtn = wrapper.find("[data-testid='start-pack-btn']")
+    await startBtn.trigger("click")
+
+    const archSelector = wrapper.findComponent({ name: "ArchitectureSelector" })
+    await archSelector.vm.$emit("confirm", "linux-arm64")
     await wrapper.vm.$nextTick()
     await new Promise((resolve) => setTimeout(resolve, 0))
 
+    expect(mockSetArchitecture).toHaveBeenCalledWith("linux-arm64")
+    expect(mockStartPackFromCart).toHaveBeenCalledWith(cartStore.items)
     expect(cartStore.isOpen).toBe(false)
     expect(router.currentRoute.value.path).toBe("/package")
+  })
+
+  it("should not start pack when architecture selection is cancelled", async () => {
+    const cartStore = useCartStore()
+    cartStore.addItem(createMockPlugin())
+
+    const wrapper = mount(CartSidebar, { global: { plugins: [router] } })
+    const startBtn = wrapper.find("[data-testid='start-pack-btn']")
+    await startBtn.trigger("click")
+
+    const archSelector = wrapper.findComponent({ name: "ArchitectureSelector" })
+    archSelector.vm.$emit("update:modelValue", false)
+    await wrapper.vm.$nextTick()
+
+    expect(mockStartPackFromCart).not.toHaveBeenCalled()
   })
 
   it("should have w-96 width and max-w-full", () => {

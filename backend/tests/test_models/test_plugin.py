@@ -1,6 +1,10 @@
 from datetime import datetime
 
+import pytest
+from pydantic import ValidationError
+
 from app.models.plugin import (
+    Architecture,
     PackPluginItem,
     PackRequest,
     PackResponse,
@@ -12,6 +16,23 @@ from app.models.plugin import (
     SessionStatus,
     TaskStatus,
 )
+
+
+class TestArchitecture:
+    def test_has_linux_amd64_value(self):
+        assert Architecture.LINUX_AMD64 == "linux-amd64"
+
+    def test_has_linux_arm64_value(self):
+        assert Architecture.LINUX_ARM64 == "linux-arm64"
+
+    def test_has_darwin_amd64_value(self):
+        assert Architecture.DARWIN_AMD64 == "darwin-amd64"
+
+    def test_has_darwin_arm64_value(self):
+        assert Architecture.DARWIN_ARM64 == "darwin-arm64"
+
+    def test_has_exactly_four_values(self):
+        assert len(Architecture) == 4
 
 
 class TestPluginSource:
@@ -77,6 +98,18 @@ class TestPackPluginItem:
         item = PackPluginItem(author="langgenius", name="agent", version="0.0.9", source=PluginSource.LOCAL)
         assert item.source == PluginSource.LOCAL
 
+    def test_architecture_defaults_to_linux_amd64(self):
+        item = PackPluginItem(author="langgenius", name="agent", version="0.0.9")
+        assert item.architecture == Architecture.LINUX_AMD64
+
+    def test_architecture_can_be_set(self):
+        item = PackPluginItem(author="langgenius", name="agent", version="0.0.9", architecture="linux-arm64")
+        assert item.architecture == Architecture.LINUX_ARM64
+
+    def test_invalid_architecture_raises_validation_error(self):
+        with pytest.raises(ValidationError):
+            PackPluginItem(author="langgenius", name="agent", version="0.0.9", architecture="windows-x86")
+
 
 class TestPackRequest:
     def test_instantiation_with_plugins(self):
@@ -141,6 +174,20 @@ class TestPackTaskInfo:
         assert task.raw_error is None
         assert task.result_file_path is None
         assert task.local_file_path is None
+
+    def test_architecture_defaults_to_linux_amd64(self):
+        now = datetime.now()
+        task = PackTaskInfo(
+            task_id="t-1",
+            session_id="s-1",
+            author="langgenius",
+            name="agent",
+            version="0.0.9",
+            source=PluginSource.MARKETPLACE,
+            created_at=now,
+            updated_at=now,
+        )
+        assert task.architecture == Architecture.LINUX_AMD64
 
     def test_json_serialization(self):
         now = datetime(2025, 1, 1, 0, 0, 0)

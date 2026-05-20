@@ -74,6 +74,7 @@ function createPackResponse(overrides: Partial<PackResponse> = {}): PackResponse
 describe("usePackagerStore", () => {
   beforeEach(() => {
     sessionStorage.clear()
+    localStorage.clear()
     setActivePinia(createPinia())
     vi.clearAllMocks()
     mockStartPack.mockReset()
@@ -125,6 +126,7 @@ describe("usePackagerStore", () => {
             name: "google-search",
             version: "1.0.0",
             source: "marketplace",
+            architecture: "linux-amd64",
           },
         ],
       })
@@ -640,6 +642,64 @@ describe("usePackagerStore", () => {
 
       expect(store.sessions.size).toBe(1)
       expect(store.tasks.size).toBe(1)
+    })
+  })
+
+  describe("architecture selection", () => {
+    it("should have selectedArchitecture default to linux-amd64", () => {
+      const store = usePackagerStore()
+      expect(store.selectedArchitecture).toBe("linux-amd64")
+    })
+
+    it("should update selectedArchitecture on setArchitecture", () => {
+      const store = usePackagerStore()
+      store.setArchitecture("linux-arm64")
+      expect(store.selectedArchitecture).toBe("linux-arm64")
+    })
+
+    it("should persist architecture to localStorage on setArchitecture", () => {
+      const store = usePackagerStore()
+      store.setArchitecture("linux-arm64")
+      expect(localStorage.getItem("selected-architecture")).toBe("linux-arm64")
+    })
+
+    it("should load saved architecture from localStorage", () => {
+      localStorage.setItem("selected-architecture", "darwin-arm64")
+      const store = usePackagerStore()
+      store.loadSavedArchitecture()
+      expect(store.selectedArchitecture).toBe("darwin-arm64")
+    })
+
+    it("should keep default when localStorage has no saved architecture", () => {
+      const store = usePackagerStore()
+      store.loadSavedArchitecture()
+      expect(store.selectedArchitecture).toBe("linux-amd64")
+    })
+
+    it("should keep default when localStorage has invalid architecture", () => {
+      localStorage.setItem("selected-architecture", "windows-x86")
+      const store = usePackagerStore()
+      store.loadSavedArchitecture()
+      expect(store.selectedArchitecture).toBe("linux-amd64")
+    })
+
+    it("should include architecture in startPackFromCart request", async () => {
+      mockStartPack.mockResolvedValue(createPackResponse())
+      const store = usePackagerStore()
+      store.setArchitecture("linux-arm64")
+      await store.startPackFromCart([createMockPlugin()])
+
+      expect(mockStartPack).toHaveBeenCalledWith({
+        plugins: [
+          {
+            author: "langgenius",
+            name: "google-search",
+            version: "1.0.0",
+            source: "marketplace",
+            architecture: "linux-arm64",
+          },
+        ],
+      })
     })
   })
 })

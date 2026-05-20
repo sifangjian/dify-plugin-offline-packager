@@ -16,7 +16,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel
 
-from app.models.plugin import PackStep
+from app.models.plugin import Architecture, PackStep
 
 
 class SSEEventType(StrEnum):
@@ -93,12 +93,14 @@ class TaskStartedEvent(SSEEvent):
         task_id: 任务ID
         plugin_name: 插件名称
         plugin_version: 插件版本
+        architecture: 目标架构
     """
 
     event_type: SSEEventType = SSEEventType.TASK_STARTED
     task_id: str
     plugin_name: str
     plugin_version: str
+    architecture: Architecture = Architecture.LINUX_AMD64
 
 
 class StepProgressEvent(SSEEvent):

@@ -3,11 +3,13 @@ import { ref, computed } from "vue"
 import { useSSE } from "@/composables/useSSE"
 import { startPack, cancelSession, getDownloadUrl } from "@/api/plugin"
 import type {
+  Architecture,
   PackPluginItem,
   PackResponse,
   PackTaskProgress,
   SSEEvent,
 } from "@/types/packager"
+import { ARCHITECTURE_OPTIONS } from "@/types/packager"
 import type { Plugin } from "@/types/marketplace"
 
 const PACKAGER_STORAGE_KEY = "dify-plugin-packager"
@@ -48,6 +50,7 @@ export const usePackagerStore = defineStore("packager", () => {
   const sessions = ref(persisted.sessions)
   const tasks = ref(persisted.tasks)
   const connectionError = ref<string | null>(null)
+  const selectedArchitecture = ref<Architecture>("linux-amd64")
 
   const sseConnections = new Map<string, ReturnType<typeof useSSE>>()
 
@@ -189,6 +192,7 @@ export const usePackagerStore = defineStore("packager", () => {
     author: string,
     name: string,
     version: string,
+    architecture: Architecture = "linux-amd64",
   ): PackTaskProgress {
     return {
       taskId,
@@ -196,6 +200,7 @@ export const usePackagerStore = defineStore("packager", () => {
       author,
       name,
       version,
+      architecture,
       status: "pending",
       currentStep: null,
       stepMessage: null,
@@ -240,6 +245,7 @@ export const usePackagerStore = defineStore("packager", () => {
       name: item.name,
       version: item.latest_version,
       source: "marketplace" as const,
+      architecture: selectedArchitecture.value,
     }))
     await submitPack(plugins)
   }
@@ -250,6 +256,7 @@ export const usePackagerStore = defineStore("packager", () => {
       name: item.name,
       version: item.latest_version,
       source: "marketplace" as const,
+      architecture: selectedArchitecture.value,
     }))
     await submitPack(plugins)
   }
@@ -349,6 +356,20 @@ export const usePackagerStore = defineStore("packager", () => {
     persistState()
   }
 
+  function setArchitecture(architecture: Architecture): void {
+    selectedArchitecture.value = architecture
+    localStorage.setItem("selected-architecture", architecture)
+  }
+
+  function loadSavedArchitecture(): void {
+    const saved = localStorage.getItem("selected-architecture")
+    if (!saved) return
+    const validValues = ARCHITECTURE_OPTIONS.map((o) => o.value)
+    if (validValues.includes(saved as Architecture)) {
+      selectedArchitecture.value = saved as Architecture
+    }
+  }
+
   return {
     sessions,
     tasks,
@@ -356,6 +377,9 @@ export const usePackagerStore = defineStore("packager", () => {
     taskList,
     hasTasks,
     connectionError,
+    selectedArchitecture,
+    setArchitecture,
+    loadSavedArchitecture,
     startPackFromCart,
     appendPack,
     cancelPack,

@@ -2,6 +2,7 @@ import os
 from unittest.mock import patch
 
 from app.core.config import Settings, get_settings
+from app.models.plugin import Architecture
 
 
 class TestSettings:
@@ -99,3 +100,33 @@ class TestSettingsDotEnvFile:
         with patch.dict(os.environ, {"PORT": "7000"}):
             settings = Settings(_env_file=str(env_file))
             assert settings.PORT == 7000
+
+
+class TestMultiArchitectureCLI:
+    def test_default_cli_paths(self):
+        settings = Settings()
+        assert settings.DIFY_PLUGIN_CLI_LINUX_AMD64 == "/app/dify-plugin-linux-amd64-5g"
+        assert settings.DIFY_PLUGIN_CLI_LINUX_ARM64 == "/app/dify-plugin-linux-arm64-5g"
+        assert settings.DIFY_PLUGIN_CLI_DARWIN_AMD64 == "/app/dify-plugin-darwin-amd64-5g"
+        assert settings.DIFY_PLUGIN_CLI_DARWIN_ARM64 == "/app/dify-plugin-darwin-arm64-5g"
+
+    def test_get_cli_path_linux_amd64(self):
+        settings = Settings()
+        assert settings.get_cli_path(Architecture.LINUX_AMD64) == "/app/dify-plugin-linux-amd64-5g"
+
+    def test_get_cli_path_linux_arm64(self):
+        settings = Settings()
+        assert settings.get_cli_path(Architecture.LINUX_ARM64) == "/app/dify-plugin-linux-arm64-5g"
+
+    def test_get_cli_path_darwin_amd64(self):
+        settings = Settings()
+        assert settings.get_cli_path(Architecture.DARWIN_AMD64) == "/app/dify-plugin-darwin-amd64-5g"
+
+    def test_get_cli_path_darwin_arm64(self):
+        settings = Settings()
+        assert settings.get_cli_path(Architecture.DARWIN_ARM64) == "/app/dify-plugin-darwin-arm64-5g"
+
+    def test_env_override_cli_linux_arm64(self):
+        with patch.dict(os.environ, {"DIFY_PLUGIN_CLI_LINUX_ARM64": "/custom/path"}):
+            settings = Settings()
+            assert settings.get_cli_path(Architecture.LINUX_ARM64) == "/custom/path"

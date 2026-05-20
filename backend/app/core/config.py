@@ -17,6 +17,8 @@
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.models.plugin import Architecture
+
 
 class Settings(BaseSettings):
     """
@@ -45,9 +47,22 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 500
     WORK_DIR: str = "/app/workspace"
     DIFY_PLUGIN_CLI_PATH: str = "/app/dify-plugin-linux-amd64-5g"
+    DIFY_PLUGIN_CLI_LINUX_AMD64: str = "/app/dify-plugin-linux-amd64-5g"
+    DIFY_PLUGIN_CLI_LINUX_ARM64: str = "/app/dify-plugin-linux-arm64-5g"
+    DIFY_PLUGIN_CLI_DARWIN_AMD64: str = "/app/dify-plugin-darwin-amd64-5g"
+    DIFY_PLUGIN_CLI_DARWIN_ARM64: str = "/app/dify-plugin-darwin-arm64-5g"
     STATIC_DIR: str = "frontend/dist"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+    def get_cli_path(self, architecture: Architecture) -> str:
+        mapping = {
+            Architecture.LINUX_AMD64: self.DIFY_PLUGIN_CLI_LINUX_AMD64,
+            Architecture.LINUX_ARM64: self.DIFY_PLUGIN_CLI_LINUX_ARM64,
+            Architecture.DARWIN_AMD64: self.DIFY_PLUGIN_CLI_DARWIN_AMD64,
+            Architecture.DARWIN_ARM64: self.DIFY_PLUGIN_CLI_DARWIN_ARM64,
+        }
+        return mapping[architecture]
 
 
 def get_settings() -> Settings:
