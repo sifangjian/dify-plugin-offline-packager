@@ -104,27 +104,32 @@ class TestSettingsDotEnvFile:
 
 class TestMultiArchitectureCLI:
     def test_default_cli_paths(self):
+        from app.core.config import _CLI_DIR
         settings = Settings()
-        assert settings.DIFY_PLUGIN_CLI_LINUX_AMD64 == "/app/dify-plugin-linux-amd64-5g"
-        assert settings.DIFY_PLUGIN_CLI_LINUX_ARM64 == "/app/dify-plugin-linux-arm64-5g"
-        assert settings.DIFY_PLUGIN_CLI_DARWIN_AMD64 == "/app/dify-plugin-darwin-amd64-5g"
-        assert settings.DIFY_PLUGIN_CLI_DARWIN_ARM64 == "/app/dify-plugin-darwin-arm64-5g"
+        assert settings.DIFY_PLUGIN_CLI_LINUX_AMD64 == f"{_CLI_DIR}/dify-plugin-linux-amd64"
+        assert settings.DIFY_PLUGIN_CLI_LINUX_ARM64 == f"{_CLI_DIR}/dify-plugin-linux-arm64"
+        assert settings.DIFY_PLUGIN_CLI_DARWIN_AMD64 == f"{_CLI_DIR}/dify-plugin-darwin-amd64"
+        assert settings.DIFY_PLUGIN_CLI_DARWIN_ARM64 == f"{_CLI_DIR}/dify-plugin-darwin-arm64"
 
     def test_get_cli_path_linux_amd64(self):
+        from app.core.config import _CLI_DIR
         settings = Settings()
-        assert settings.get_cli_path(Architecture.LINUX_AMD64) == "/app/dify-plugin-linux-amd64-5g"
+        assert settings.get_cli_path(Architecture.LINUX_AMD64) == f"{_CLI_DIR}/dify-plugin-linux-amd64"
 
     def test_get_cli_path_linux_arm64(self):
+        from app.core.config import _CLI_DIR
         settings = Settings()
-        assert settings.get_cli_path(Architecture.LINUX_ARM64) == "/app/dify-plugin-linux-arm64-5g"
+        assert settings.get_cli_path(Architecture.LINUX_ARM64) == f"{_CLI_DIR}/dify-plugin-linux-arm64"
 
     def test_get_cli_path_darwin_amd64(self):
+        from app.core.config import _CLI_DIR
         settings = Settings()
-        assert settings.get_cli_path(Architecture.DARWIN_AMD64) == "/app/dify-plugin-darwin-amd64-5g"
+        assert settings.get_cli_path(Architecture.DARWIN_AMD64) == f"{_CLI_DIR}/dify-plugin-darwin-amd64"
 
     def test_get_cli_path_darwin_arm64(self):
+        from app.core.config import _CLI_DIR
         settings = Settings()
-        assert settings.get_cli_path(Architecture.DARWIN_ARM64) == "/app/dify-plugin-darwin-arm64-5g"
+        assert settings.get_cli_path(Architecture.DARWIN_ARM64) == f"{_CLI_DIR}/dify-plugin-darwin-arm64"
 
     def test_env_override_cli_linux_arm64(self):
         with patch.dict(os.environ, {"DIFY_PLUGIN_CLI_LINUX_ARM64": "/custom/path"}):

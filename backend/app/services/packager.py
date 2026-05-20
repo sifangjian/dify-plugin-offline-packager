@@ -19,6 +19,7 @@ import asyncio
 import contextlib
 import os
 import re
+import stat
 import sys
 import time
 import uuid
@@ -554,6 +555,8 @@ class PackagerService:
         has_requirements = (plugin_dir / "requirements.txt").exists()
 
         if has_pyproject and has_requirements:
+            req_file = plugin_dir / "requirements.txt"
+            self._patch_requirements(req_file)
             return
 
         if has_pyproject and not has_requirements:
@@ -622,14 +625,19 @@ class PackagerService:
             return
         patches = self._settings.DEPENDENCY_VERSION_PATCHES
         removal_list = self._settings.DEPENDENCY_REMOVAL_LIST
-        lines = req_file_path.read_text().splitlines()
+        content = req_file_path.read_text()
+        content = re.sub(r"\\\n\s+", " ", content)
+        lines = content.splitlines()
         patched_lines = []
         for line in lines:
             stripped = line.strip()
             if not stripped or stripped.startswith("#") or stripped.startswith("-"):
                 patched_lines.append(line)
                 continue
-            match = re.match(r"^([A-Za-z0-9_.-]+(?:\[.*?\])?)\s*(~=|==|!=|<=|>=|<|>|===)\s*(.+)$", stripped)
+            match = re.match(
+                r"^([A-Za-z0-9_.-]+(?:\[.*?\])?)\s*(~=|==|!=|<=|>=|<|>|===)\s*([^\s;]+)",
+                stripped,
+            )
             if not match:
                 patched_lines.append(line)
                 continue
@@ -644,9 +652,6 @@ class PackagerService:
                 if pkg_name_lower == rp_lower or pkg_name_no_extras == rp_lower:
                     should_remove = True
                     break
-                if pkg_name_no_extras == rp_lower:
-                    should_remove = True
-                    break
             if should_remove:
                 continue
             version_key = f"{operator}{version}"
@@ -656,7 +661,9 @@ class PackagerService:
             elif pkg_name_no_extras in patches and version_key in patches[pkg_name_no_extras]:
                 replacement = patches[pkg_name_no_extras][version_key]
             if replacement:
-                patched_lines.append(replacement)
+                result = re.sub(re.escape(f"{pkg_name_with_extras}{operator}{version}"), replacement, stripped, count=1)
+                result = re.sub(r"\s*--hash=\S+", "", result)
+                patched_lines.append(result)
             else:
                 patched_lines.append(line)
         req_file_path.write_text("\n".join(patched_lines) + "\n")
@@ -812,6 +819,37 @@ class PackagerService:
                 env=pip_env,
             )
             if returncode != 0:
+                error_msg = stderr.decode()
+                print(f"[pip download] Mirror failed, trying official PyPI...")
+                pip_cmd_official = self._build_pip_download_cmd(
+                    task,
+                    str(plugin_dir / "requirements.txt"),
+                    str(wheels_dir),
+                    "https://pypi.org/simple",
+                )
+                returncode, stderr = await self._run_subprocess_with_progress(
+                    task,
+                    pip_cmd_official,
+                    cwd=str(plugin_dir),
+                    progress_callback=on_progress,
+                    env=pip_env,
+                )
+            if returncode != 0:
+                error_msg = stderr.decode()
+                print(f"[pip download] Official PyPI with --platform failed, trying without --platform...")
+                pip_cmd_no_platform = self._build_pip_download_cmd_no_platform(
+                    str(plugin_dir / "requirements.txt"),
+                    str(wheels_dir),
+                    pip_mirror_url,
+                )
+                returncode, stderr = await self._run_subprocess_with_progress(
+                    task,
+                    pip_cmd_no_platform,
+                    cwd=str(plugin_dir),
+                    progress_callback=on_progress,
+                    env=pip_env,
+                )
+            if returncode != 0:
                 raise PackageStepError(
                     step=PackStep.DOWNLOADING_DEPS,
                     message="下载依赖包失败",
@@ -949,8 +987,33 @@ class PackagerService:
             "--trusted-host", trusted_host,
         ]
 
+    def _build_pip_download_cmd_no_platform(
+        self,
+        req_file_path: str,
+        wheels_dir: str,
+        pip_mirror_url: str,
+    ) -> list[str]:
+        trusted_host = pip_mirror_url.split("//")[1].split("/")[0]
+        return [
+            sys.executable,
+            "-m",
+            "pip",
+            "download",
+            "--prefer-binary",
+            "--timeout", "120",
+            "--retries", "3",
+            "-r", req_file_path,
+            "-d", wheels_dir,
+            "--index-url", pip_mirror_url,
+            "--trusted-host", trusted_host,
+        ]
+
     def _get_cli_path(self, task: PackTaskInfo) -> str:
-        return self._settings.get_cli_path(task.architecture)
+        cli_path = self._settings.get_cli_path(task.architecture)
+        path = Path(cli_path)
+        if path.exists() and not os.access(str(path), os.X_OK):
+            path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        return cli_path
 
     def _validate_cli_path(self, task: PackTaskInfo) -> None:
         cli_path = self._get_cli_path(task)

@@ -17,9 +17,13 @@
 - DEPENDENCY_REMOVAL_LIST: 需要移除的依赖包列表
 """
 
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.models.plugin import Architecture
+
+_CLI_DIR = str(Path(__file__).resolve().parent.parent)
 
 
 class Settings(BaseSettings):
@@ -50,11 +54,11 @@ class Settings(BaseSettings):
     PORT: int = 8080
     MAX_UPLOAD_SIZE_MB: int = 500
     WORK_DIR: str = "/app/workspace"
-    DIFY_PLUGIN_CLI_PATH: str = "/app/dify-plugin-linux-amd64-5g"
-    DIFY_PLUGIN_CLI_LINUX_AMD64: str = "/app/dify-plugin-linux-amd64-5g"
-    DIFY_PLUGIN_CLI_LINUX_ARM64: str = "/app/dify-plugin-linux-arm64-5g"
-    DIFY_PLUGIN_CLI_DARWIN_AMD64: str = "/app/dify-plugin-darwin-amd64-5g"
-    DIFY_PLUGIN_CLI_DARWIN_ARM64: str = "/app/dify-plugin-darwin-arm64-5g"
+    DIFY_PLUGIN_CLI_PATH: str = ""
+    DIFY_PLUGIN_CLI_LINUX_AMD64: str = f"{_CLI_DIR}/dify-plugin-linux-amd64"
+    DIFY_PLUGIN_CLI_LINUX_ARM64: str = f"{_CLI_DIR}/dify-plugin-linux-arm64"
+    DIFY_PLUGIN_CLI_DARWIN_AMD64: str = f"{_CLI_DIR}/dify-plugin-darwin-amd64"
+    DIFY_PLUGIN_CLI_DARWIN_ARM64: str = f"{_CLI_DIR}/dify-plugin-darwin-arm64"
     STATIC_DIR: str = "frontend/dist"
     DEPENDENCY_VERSION_PATCHES: dict[str, dict[str, str]] = {
         "greenlet": {

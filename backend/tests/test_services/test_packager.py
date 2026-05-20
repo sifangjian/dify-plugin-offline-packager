@@ -84,6 +84,25 @@ class TestPipDownloadArchitecture:
         assert "--only-binary=:all:" in cmd
 
 
+class TestPipDownloadCmdNoPlatform:
+    def test_no_platform_flag(self, packager):
+        cmd = packager._build_pip_download_cmd_no_platform("/tmp/req.txt", "/tmp/wheels", "https://mirrors.aliyun.com/pypi/simple")
+        assert "--platform" not in cmd
+
+    def test_no_only_binary_flag(self, packager):
+        cmd = packager._build_pip_download_cmd_no_platform("/tmp/req.txt", "/tmp/wheels", "https://mirrors.aliyun.com/pypi/simple")
+        assert "--only-binary=:all:" not in cmd
+
+    def test_includes_prefer_binary(self, packager):
+        cmd = packager._build_pip_download_cmd_no_platform("/tmp/req.txt", "/tmp/wheels", "https://mirrors.aliyun.com/pypi/simple")
+        assert "--prefer-binary" in cmd
+
+    def test_includes_index_url(self, packager):
+        cmd = packager._build_pip_download_cmd_no_platform("/tmp/req.txt", "/tmp/wheels", "https://mirrors.aliyun.com/pypi/simple")
+        assert "--index-url" in cmd
+        assert "https://mirrors.aliyun.com/pypi/simple" in cmd
+
+
 class TestStepPackageArchitecture:
     def test_linux_amd64_uses_correct_cli_path(self, packager, mock_settings):
         task = create_task(Architecture.LINUX_AMD64)
@@ -149,6 +168,14 @@ class TestPatchRequirements:
         assert "xhtml2pdf" not in content
         assert "flask>=3.0.0" in content
 
+    def test_preserve_hash_when_no_patch(self, packager, tmp_path):
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("unknown-pkg==1.0.0 --hash=sha256:abc123\n")
+        packager._patch_requirements(req_file)
+        content = req_file.read_text()
+        assert "unknown-pkg==1.0.0" in content
+        assert "--hash=sha256:abc123" in content
+
     def test_preserve_unknown_package(self, packager, tmp_path):
         req_file = tmp_path / "requirements.txt"
         req_file.write_text("unknown-pkg==1.0.0\n")
@@ -181,3 +208,49 @@ class TestPatchRequirements:
         assert "greenlet>=3.2.0" in content
         assert "flask~=3.0.0" in content
         assert "unknown-pkg==1.0.0" in content
+
+    def test_greenlet_330_replaced(self, packager, tmp_path):
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("greenlet==3.3.0\nflask==2.3.2\nrequests==2.32.0\n")
+        packager._patch_requirements(req_file)
+        content = req_file.read_text()
+        assert "greenlet==3.3.0" not in content
+        assert "greenlet>=3.2.0" in content
+        assert "flask==2.3.2" in content
+        assert "requests==2.32.0" in content
+
+    def test_patch_with_environment_marker(self, packager, tmp_path):
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("greenlet==3.3.0 ; python_version>='3.8'\n")
+        packager._patch_requirements(req_file)
+        content = req_file.read_text()
+        assert "greenlet==3.3.0" not in content
+        assert "greenlet>=3.2.0" in content
+        assert "python_version>='3.8'" in content
+
+    def test_patch_with_hash(self, packager, tmp_path):
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("greenlet==3.3.0 --hash=sha256:abc123\n")
+        packager._patch_requirements(req_file)
+        content = req_file.read_text()
+        assert "greenlet==3.3.0" not in content
+        assert "greenlet>=3.2.0" in content
+        assert "--hash" not in content
+
+    def test_patch_uv_export_multiline_format(self, packager, tmp_path):
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("greenlet==3.3.0 \\\n    --hash=sha256:abc123 \\\n    --hash=sha256:def456\nflask==3.0.3\n")
+        packager._patch_requirements(req_file)
+        content = req_file.read_text()
+        assert "greenlet==3.3.0" not in content
+        assert "greenlet>=3.2.0" in content
+        assert "--hash" not in content
+        assert "flask>=3.0.0" in content
+
+    def test_remove_with_environment_marker(self, packager, tmp_path):
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("xhtml2pdf==0.2.17 ; python_version>='3.8'\nflask==3.0.3\n")
+        packager._patch_requirements(req_file)
+        content = req_file.read_text()
+        assert "xhtml2pdf" not in content
+        assert "flask>=3.0.0" in content
