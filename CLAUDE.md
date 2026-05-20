@@ -38,7 +38,7 @@ npm run test:watch   # Vitest watch mode
 **Dependency direction:** `api/ → services/ → models/`, `api/ → core/`, `services/ → core/`. Never import in reverse.
 
 - **`main.py`** — FastAPI app entry. Mounts static files and SPA fallback for production.
-- **`core/config.py`** — `Settings` via pydantic-settings. All config from env vars / `.env`. Access via `get_settings()`.
+- **`core/config.py`** — `Settings` via pydantic-settings. All config from env vars / `.env`. Access via `get_settings()`. Includes `DEPENDENCY_VERSION_PATCHES` (version replacement mappings) and `DEPENDENCY_REMOVAL_LIST` (packages to remove) for handling incompatible dependency versions.
 - **`core/lifespan.py`** — Initializes httpx client, StorageService, PackagerService on startup; cleans up on shutdown. Services stored on `app.state`.
 - **`core/exceptions.py`** — `AppException` hierarchy and global FastAPI exception handlers.
 - **`api/`** — Three routers aggregated in `api/router.py`:
@@ -52,6 +52,7 @@ npm run test:watch   # Vitest watch mode
   4. For local plugins: resolve deps → download deps → package
   5. Each step emits SSE events to subscribers
   - Uses `_run_subprocess_with_progress()` for pip and dify-plugin CLI, with throttled (200ms) progress callbacks
+  - `_patch_requirements()` applies version compatibility patches to `requirements.txt` before `pip download`, replacing unavailable versions (e.g., `greenlet==3.3.0` → `greenlet>=3.2.0`) and removing incompatible packages (e.g., `xhtml2pdf`)
 - **`services/marketplace.py`** — HTTP client wrapper for Dify Marketplace API
 - **`services/storage.py`** — Manages per-task directory structure under `WORK_DIR`:
   ```

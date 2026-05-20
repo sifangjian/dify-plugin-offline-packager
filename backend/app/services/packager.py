@@ -18,12 +18,14 @@
 import asyncio
 import contextlib
 import os
+import re
 import sys
 import time
 import uuid
 import zipfile
 from collections.abc import Callable
 from datetime import datetime
+from pathlib import Path
 
 import httpx
 
@@ -512,6 +514,7 @@ class PackagerService:
         1. 解压 .difypkg 文件到 plugin 目录
         2. 检查是否存在 pyproject.toml 或 requirements.txt
         3. 如果只有 pyproject.toml，使用 uv 工具生成 requirements.txt
+        4. 对 requirements.txt 进行版本兼容性处理，替换不存在的版本
 
         Args:
             task: 任务信息
@@ -600,6 +603,63 @@ class PackagerService:
                 message="插件缺少依赖定义文件",
                 raw_error="No pyproject.toml or requirements.txt found",
             )
+        req_file = plugin_dir / "requirements.txt"
+        self._patch_requirements(req_file)
+
+    def _patch_requirements(self, req_file_path: Path) -> None:
+        """
+        对 requirements.txt 进行版本兼容性处理
+
+        处理 PyPI 上不存在的依赖版本，确保 pip download 能够成功。
+        主要功能：
+        1. 替换不存在的版本号为可用的版本号
+        2. 移除已知不兼容的依赖包
+
+        Args:
+            req_file_path: requirements.txt 文件路径
+        """
+        if not req_file_path.exists():
+            return
+        patches = self._settings.DEPENDENCY_VERSION_PATCHES
+        removal_list = self._settings.DEPENDENCY_REMOVAL_LIST
+        lines = req_file_path.read_text().splitlines()
+        patched_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or stripped.startswith("-"):
+                patched_lines.append(line)
+                continue
+            match = re.match(r"^([A-Za-z0-9_.-]+(?:\[.*?\])?)\s*(~=|==|!=|<=|>=|<|>|===)\s*(.+)$", stripped)
+            if not match:
+                patched_lines.append(line)
+                continue
+            pkg_name_with_extras = match.group(1)
+            operator = match.group(2)
+            version = match.group(3).strip()
+            pkg_name_lower = pkg_name_with_extras.lower()
+            pkg_name_no_extras = re.sub(r"\[.*?\]", "", pkg_name_with_extras).lower()
+            should_remove = False
+            for remove_pkg in removal_list:
+                rp_lower = remove_pkg.lower()
+                if pkg_name_lower == rp_lower or pkg_name_no_extras == rp_lower:
+                    should_remove = True
+                    break
+                if pkg_name_no_extras == rp_lower:
+                    should_remove = True
+                    break
+            if should_remove:
+                continue
+            version_key = f"{operator}{version}"
+            replacement = None
+            if pkg_name_lower in patches and version_key in patches[pkg_name_lower]:
+                replacement = patches[pkg_name_lower][version_key]
+            elif pkg_name_no_extras in patches and version_key in patches[pkg_name_no_extras]:
+                replacement = patches[pkg_name_no_extras][version_key]
+            if replacement:
+                patched_lines.append(replacement)
+            else:
+                patched_lines.append(line)
+        req_file_path.write_text("\n".join(patched_lines) + "\n")
 
     async def _step_download_deps(self, task: PackTaskInfo) -> None:
         task.current_step = PackStep.DOWNLOADING_DEPS
@@ -894,7 +954,6 @@ class PackagerService:
 
     def _validate_cli_path(self, task: PackTaskInfo) -> None:
         cli_path = self._get_cli_path(task)
-        from pathlib import Path
         if not Path(cli_path).exists():
             raise PackageStepError(
                 step=PackStep.PACKAGING,

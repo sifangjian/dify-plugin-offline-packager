@@ -44,6 +44,14 @@ npm run dev
 - **通信**：SSE (Server-Sent Events)
 - **部署**：Docker 多阶段构建
 
+## 功能特性
+
+- **插件搜索**：从 Dify Marketplace 搜索和浏览插件
+- **离线打包**：自动下载插件及其所有 Python 依赖，生成离线安装包
+- **依赖兼容性处理**：自动处理 PyPI 上不存在的依赖版本，确保打包成功率
+- **实时进度**：通过 SSE 实时显示打包进度
+- **多架构支持**：支持 Linux (amd64/arm64) 和 macOS (amd64/arm64)
+
 ## License
 
 MIT

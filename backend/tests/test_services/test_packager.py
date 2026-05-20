@@ -1,12 +1,12 @@
-import sys
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.core.config import Settings
-from app.models.plugin import Architecture, PackStep, PackTaskInfo, PluginSource, TaskStatus
-from app.services.packager import PackageStepError, PackagerService
+from app.models.plugin import Architecture, PackTaskInfo, PluginSource
+from app.services.packager import PackagerService, PackageStepError
 from app.services.storage import StorageService
 
 
@@ -126,3 +126,58 @@ class TestArchitectureExceptionHandling:
             with pytest.raises(PackageStepError) as exc_info:
                 packager._validate_cli_path(task)
             assert "CLI 工具不存在" in exc_info.value.message
+
+
+class TestPatchRequirements:
+    def test_patch_exact_version(self, packager, tmp_path):
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("greenlet==3.3.0\n")
+        packager._patch_requirements(req_file)
+        assert req_file.read_text() == "greenlet>=3.2.0\n"
+
+    def test_patch_compatible_version(self, packager, tmp_path):
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("greenlet~=3.3.0\n")
+        packager._patch_requirements(req_file)
+        assert req_file.read_text() == "greenlet~=3.2.0\n"
+
+    def test_remove_dependency(self, packager, tmp_path):
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("xhtml2pdf==0.2.17\nflask==3.0.3\n")
+        packager._patch_requirements(req_file)
+        content = req_file.read_text()
+        assert "xhtml2pdf" not in content
+        assert "flask>=3.0.0" in content
+
+    def test_preserve_unknown_package(self, packager, tmp_path):
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("unknown-pkg==1.0.0\n")
+        packager._patch_requirements(req_file)
+        assert req_file.read_text() == "unknown-pkg==1.0.0\n"
+
+    def test_preserve_comments_and_options(self, packager, tmp_path):
+        req_file = tmp_path / "requirements.txt"
+        original = "# this is a comment\n--index-url https://pypi.org/simple\nflask==3.0.3\n"
+        req_file.write_text(original)
+        packager._patch_requirements(req_file)
+        content = req_file.read_text()
+        assert "# this is a comment" in content
+        assert "--index-url https://pypi.org/simple" in content
+
+    def test_patch_package_with_extras(self, packager, tmp_path):
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("pandas[output_formatting]~=3.0.1\n")
+        packager._patch_requirements(req_file)
+        assert req_file.read_text() == "pandas>=2.2.0\n"
+
+    def test_no_file_no_error(self, packager):
+        packager._patch_requirements(Path("/nonexistent/file.txt"))
+
+    def test_multiple_patches_in_one_file(self, packager, tmp_path):
+        req_file = tmp_path / "requirements.txt"
+        req_file.write_text("greenlet==3.3.0\nflask~=3.0.3\nunknown-pkg==1.0.0\n")
+        packager._patch_requirements(req_file)
+        content = req_file.read_text()
+        assert "greenlet>=3.2.0" in content
+        assert "flask~=3.0.0" in content
+        assert "unknown-pkg==1.0.0" in content
