@@ -55,6 +55,19 @@ class PluginResource(BaseModel):
     memory: int = 0
 
 
+class ReadmeMeta(BaseModel):
+    """
+    README 元信息
+
+    插件介绍文档的多语言可用性信息。
+
+    Attributes:
+        available_languages: 可用的语言版本列表
+    """
+
+    available_languages: list[str] = []
+
+
 class PluginTag(BaseModel):
     """
     插件标签
@@ -104,6 +117,7 @@ class PluginInfo(BaseModel):
     label: I18nText = I18nText()
     brief: I18nText = I18nText()
     introduction: str = ""
+    readme_meta: ReadmeMeta = ReadmeMeta()
     category: str = ""
     created_at: str = ""
     updated_at: str = ""

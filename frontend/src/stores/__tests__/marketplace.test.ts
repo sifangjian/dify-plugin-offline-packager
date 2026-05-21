@@ -21,6 +21,7 @@ function createMockPlugin(overrides: Partial<Plugin> = {}): Plugin {
     label: { en_US: "Test Plugin", zh_Hans: "测试插件" },
     brief: { en_US: "A test plugin", zh_Hans: "一个测试插件" },
     introduction: "",
+    readme_meta: { available_languages: [] },
     category: "tool",
     created_at: "2024-01-01",
     updated_at: "2024-01-01",

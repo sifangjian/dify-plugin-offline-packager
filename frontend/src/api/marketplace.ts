@@ -17,9 +17,14 @@ export async function searchPlugins(params: SearchParams, signal?: AbortSignal):
   return response.data
 }
 
-export async function getPluginDetail(author: string, name: string): Promise<Plugin> {
+export async function getPluginDetail(author: string, name: string, language?: string): Promise<Plugin> {
+  const params: Record<string, string> = {}
+  if (language) {
+    params.language = language
+  }
   const response = await apiClient.get<Plugin>(
-    `/v1/marketplace/${author}/${name}`
+    `/v1/marketplace/${author}/${name}`,
+    { params }
   )
   return response.data
 }

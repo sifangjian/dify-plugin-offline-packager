@@ -47,7 +47,20 @@ describe("Marketplace API", () => {
       await getPluginDetail("langgenius", "google")
 
       expect(mockGet).toHaveBeenCalledWith(
-        "/v1/marketplace/langgenius/google"
+        "/v1/marketplace/langgenius/google",
+        { params: {} }
+      )
+    })
+
+    it("should send GET request with language param when provided", async () => {
+      mockGet.mockResolvedValue({ data: {} })
+      const { getPluginDetail } = await import("@/api/marketplace")
+
+      await getPluginDetail("langgenius", "google", "zh_Hans")
+
+      expect(mockGet).toHaveBeenCalledWith(
+        "/v1/marketplace/langgenius/google",
+        { params: { language: "zh_Hans" } }
       )
     })
   })

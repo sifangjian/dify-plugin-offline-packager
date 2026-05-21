@@ -11,6 +11,14 @@ export interface PluginResource {
   memory: number
 }
 
+export interface ReadmeMeta {
+  available_languages: string[]
+}
+
+export interface PluginTag {
+  name: string
+}
+
 export interface Plugin {
   type: string
   name: string
@@ -19,6 +27,7 @@ export interface Plugin {
   label: I18nText
   brief: I18nText
   introduction: string
+  readme_meta: ReadmeMeta
   category: string
   created_at: string
   updated_at: string
@@ -26,7 +35,7 @@ export interface Plugin {
   latest_version: string
   latest_package_identifier: string
   status: string
-  tags: string[]
+  tags: PluginTag[]
   verification: PluginVerification | null
   badges: (Record<string, unknown> | string)[]
   repository: string | null

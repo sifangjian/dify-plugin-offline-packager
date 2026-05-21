@@ -13,6 +13,7 @@ from app.models.marketplace import (
     PluginResource,
     PluginTag,
     PluginVerification,
+    ReadmeMeta,
     SearchRequest,
     SearchResponse,
 )
@@ -55,6 +56,20 @@ class TestPluginResource:
         assert r.memory == 512
 
 
+class TestReadmeMeta:
+    def test_default_values(self):
+        meta = ReadmeMeta()
+        assert meta.available_languages == []
+
+    def test_custom_values(self):
+        meta = ReadmeMeta(available_languages=["en_US", "zh_Hans"])
+        assert meta.available_languages == ["en_US", "zh_Hans"]
+
+    def test_from_dict(self):
+        meta = ReadmeMeta(**{"available_languages": ["en_US"]})
+        assert meta.available_languages == ["en_US"]
+
+
 class TestPluginInfo:
     def test_valid_minimal_data(self):
         plugin = PluginInfo(
@@ -78,6 +93,7 @@ class TestPluginInfo:
         assert plugin.label == I18nText()
         assert plugin.brief == I18nText()
         assert plugin.introduction == ""
+        assert plugin.readme_meta == ReadmeMeta()
         assert plugin.category == ""
         assert plugin.install_count == 0
         assert plugin.latest_version == ""
@@ -97,6 +113,7 @@ class TestPluginInfo:
             label=I18nText(en_US="Agent", zh_Hans="智能体"),
             brief=I18nText(en_US="An agent plugin", zh_Hans="智能体插件"),
             introduction="This is an agent plugin",
+            readme_meta=ReadmeMeta(available_languages=["en_US", "zh_Hans"]),
             category="agent",
             created_at="2024-01-01",
             updated_at="2024-06-01",
@@ -118,6 +135,7 @@ class TestPluginInfo:
         assert plugin.resource.memory == 512
         assert len(plugin.tags) == 2
         assert plugin.tags[0].name == "agent"
+        assert plugin.readme_meta.available_languages == ["en_US", "zh_Hans"]
 
     def test_missing_required_field_type(self):
         with pytest.raises(ValidationError) as exc_info:

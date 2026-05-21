@@ -99,7 +99,7 @@ class MarketplaceService:
         plugins = [PluginInfo(**p) for p in data.get("plugins", [])]
         return SearchResponse(plugins=plugins, total=data.get("total", 0))
 
-    async def get_plugin_detail(self, author: str, name: str) -> PluginInfo:
+    async def get_plugin_detail(self, author: str, name: str, language: str | None = None) -> PluginInfo:
         """
         获取插件详情
 
@@ -108,11 +108,15 @@ class MarketplaceService:
         Args:
             author: 插件作者标识
             name: 插件名称
+            language: 请求的语言版本（如 zh_Hans），不传则返回默认语言
 
         Returns:
             PluginInfo: 插件详细信息
         """
-        data = await self._request("GET", f"/api/v1/plugins/{author}/{name}")
+        params = {}
+        if language:
+            params["language"] = language
+        data = await self._request("GET", f"/api/v1/plugins/{author}/{name}", params=params)
         return PluginInfo(**data.get("plugin", {}))
 
     async def get_collections(self, page: int, page_size: int) -> CollectionsResponse:

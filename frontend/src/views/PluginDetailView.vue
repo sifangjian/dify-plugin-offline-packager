@@ -70,7 +70,7 @@
                 v-if="plugin.category"
                 class="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded"
               >
-                {{ plugin.category }}
+                {{ getCategoryLabel(plugin.category) }}
               </span>
               <span class="text-xs text-gray-400">
                 {{ formatInstallCount(plugin.install_count) }} 次安装
@@ -96,7 +96,7 @@
         </div>
 
         <div
-          v-if="plugin.introduction"
+          v-if="displayIntroduction"
           class="mt-6"
         >
           <h3 class="text-sm font-medium text-gray-700 mb-2">
@@ -118,10 +118,11 @@
           <div class="flex flex-wrap gap-2">
             <span
               v-for="tag in plugin.tags"
-              :key="tag"
-              class="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded"
+              :key="tag.name"
+              :title="getTagTooltip(tag.name)"
+              class="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded cursor-help"
             >
-              {{ tag }}
+              {{ getTagLabel(tag.name) }}
             </span>
           </div>
         </div>
@@ -149,11 +150,11 @@
           </div>
           <div v-if="plugin.resource">
             <span class="text-gray-500">内存需求：</span>
-            <span>{{ plugin.resource.memory }} MB</span>
+            <span>{{ formatMemory(plugin.resource.memory) }}</span>
           </div>
           <div v-if="plugin.updated_at">
             <span class="text-gray-500">更新时间：</span>
-            <span>{{ plugin.updated_at }}</span>
+            <span>{{ formatDateTime(plugin.updated_at) }}</span>
           </div>
         </div>
       </div>
@@ -178,18 +179,86 @@ import ArchitectureSelector from "@/components/ArchitectureSelector.vue"
 import type { Plugin } from "@/types/marketplace"
 import type { Architecture } from "@/types/packager"
 
+const TAG_LABELS: Record<string, string> = {
+  agent: "Agent 策略",
+  tool: "工具",
+  model: "模型",
+  llm: "大语言模型",
+  text_embedding: "文本嵌入",
+  rerank: "重排序",
+  tts: "文本转语音",
+  speech2text: "语音转文本",
+  extension: "扩展",
+  endpoint: "端点",
+  datasource: "数据源",
+  trigger: "触发器",
+  productivity: "生产力",
+  search: "搜索",
+  communication: "通讯",
+  image: "图像",
+  audio: "音频",
+  video: "视频",
+  coding: "编程",
+  data: "数据",
+  security: "安全",
+  analytics: "分析",
+  automation: "自动化",
+}
+
+const TAG_TOOLTIPS: Record<string, string> = {
+  agent: "Agent 推理策略插件，定义 Agent 节点中的工具选择和调用逻辑",
+  tool: "工具类插件，提供外部 API 调用能力，可在工作流或 Agent 中使用",
+  model: "模型类插件，集成大语言模型或其他 AI 模型的调用能力",
+  llm: "大语言模型插件，支持文本生成、对话等核心语言能力",
+  text_embedding: "文本嵌入插件，将文本转换为向量表示，用于语义搜索和相似度计算",
+  rerank: "重排序插件，对搜索结果进行相关性重新排序，提升检索精度",
+  tts: "文本转语音插件，将文本内容转换为语音输出",
+  speech2text: "语音转文本插件，将语音输入转换为文字内容",
+  extension: "扩展类插件，提供轻量级的 HTTP 端点服务",
+  endpoint: "端点插件，注册自定义 HTTP 接口，支持 Webhook 等场景",
+  datasource: "数据源插件，从外部系统导入数据到知识库",
+  trigger: "触发器插件，基于事件驱动工作流执行",
+  productivity: "生产力工具，提升工作效率的插件",
+  search: "搜索工具，提供信息检索和查询能力",
+  communication: "通讯工具，支持消息发送和接收",
+  image: "图像处理工具，支持图像生成、编辑和分析",
+  audio: "音频处理工具，支持音频相关操作",
+  video: "视频处理工具，支持视频相关操作",
+  coding: "编程工具，支持代码生成、分析和执行",
+  data: "数据处理工具，支持数据转换、清洗和管理",
+  security: "安全工具，提供内容审核和安全检测能力",
+  analytics: "分析工具，提供数据分析和洞察功能",
+  automation: "自动化工具，支持任务自动执行和流程编排",
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  model: "模型",
+  tool: "工具",
+  "agent-strategy": "Agent 策略",
+  extension: "扩展",
+  bundle: "插件包",
+  datasource: "数据源",
+  trigger: "触发器",
+}
+
 const route = useRoute()
 const router = useRouter()
 const packagerStore = usePackagerStore()
 
 const plugin = ref<Plugin | null>(null)
+const localizedIntroduction = ref<string>("")
 const isLoading = ref(true)
 const error = ref<string | null>(null)
 const showArchSelector = ref(false)
 
+const displayIntroduction = computed(() => {
+  return localizedIntroduction.value || plugin.value?.introduction || ""
+})
+
 const renderedIntroduction = computed(() => {
-  if (!plugin.value?.introduction) return ""
-  const rawHtml = marked.parse(plugin.value.introduction) as string
+  const content = displayIntroduction.value
+  if (!content) return ""
+  const rawHtml = marked.parse(content) as string
   return DOMPurify.sanitize(rawHtml)
 })
 
@@ -209,10 +278,58 @@ function getI18nText(text: { zh_Hans: string; en_US: string }): string {
   return text.zh_Hans || text.en_US
 }
 
+function getTagLabel(tagName: string): string {
+  return TAG_LABELS[tagName] || tagName
+}
+
+function getTagTooltip(tagName: string): string {
+  return TAG_TOOLTIPS[tagName] || `标签：${tagName}`
+}
+
+function getCategoryLabel(category: string): string {
+  return CATEGORY_LABELS[category] || category
+}
+
 function formatInstallCount(count: number): string {
   if (count >= 10000) return `${(count / 10000).toFixed(1)}万`
   if (count >= 1000) return `${(count / 1000).toFixed(1)}k`
   return String(count)
+}
+
+function formatMemory(bytes: number): string {
+  if (bytes <= 0) return "0 MB"
+  const mb = bytes / (1024 * 1024)
+  if (mb < 1) return `${bytes} B`
+  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`
+  if (Number.isInteger(mb)) return `${mb} MB`
+  return `${mb.toFixed(1)} MB`
+}
+
+function formatDateTime(dateStr: string): string {
+  if (!dateStr) return ""
+  const date = new Date(dateStr)
+  if (isNaN(date.getTime())) return dateStr
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  const hours = String(date.getHours()).padStart(2, "0")
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+  return `${year}年${month}月${day}日 ${hours}:${minutes}`
+}
+
+async function fetchLocalizedIntroduction(author: string, name: string) {
+  if (!plugin.value?.readme_meta?.available_languages) return
+  const hasZhHans = plugin.value.readme_meta.available_languages.includes("zh_Hans")
+  if (!hasZhHans) return
+
+  try {
+    const zhPlugin = await getPluginDetail(author, name, "zh_Hans")
+    if (zhPlugin.introduction && zhPlugin.introduction.trim()) {
+      localizedIntroduction.value = zhPlugin.introduction
+    }
+  } catch {
+    localizedIntroduction.value = ""
+  }
 }
 
 async function fetchDetail() {
@@ -222,9 +339,11 @@ async function fetchDetail() {
 
   isLoading.value = true
   error.value = null
+  localizedIntroduction.value = ""
 
   try {
     plugin.value = await getPluginDetail(author, name)
+    await fetchLocalizedIntroduction(author, name)
   } catch (err: unknown) {
     const apiError = err as { message?: string }
     error.value = apiError.message || "加载插件详情失败"

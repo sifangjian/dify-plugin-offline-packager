@@ -97,7 +97,7 @@ async def get_collections(
 
 @router.get("/{author}/{name}", response_model=PluginInfo)
 async def get_plugin_detail(
-    author: str, name: str, service: MarketplaceService = _marketplace_service_dep
+    author: str, name: str, language: str | None = None, service: MarketplaceService = _marketplace_service_dep
 ) -> PluginInfo:
     """
     获取插件详情
@@ -107,12 +107,13 @@ async def get_plugin_detail(
     Args:
         author: 插件作者标识
         name: 插件名称
+        language: 请求的语言版本（如 zh_Hans），不传则返回默认语言
         service: Marketplace 服务实例（依赖注入）
 
     Returns:
         PluginInfo: 插件详细信息
     """
-    return await service.get_plugin_detail(author, name)
+    return await service.get_plugin_detail(author, name, language=language)
 
 
 @router.post("/batch", response_model=BatchResponse)
