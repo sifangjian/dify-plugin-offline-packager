@@ -13,6 +13,7 @@ import { ARCHITECTURE_OPTIONS } from "@/types/packager"
 import type { Plugin } from "@/types/marketplace"
 
 const PACKAGER_STORAGE_KEY = "dify-plugin-packager"
+const QUEUE_STORAGE_KEY = "dify-plugin-packager-queue"
 
 interface SessionState {
   sessionId: string
@@ -45,12 +46,27 @@ function loadFromStorage(): { sessions: Map<string, SessionState>; tasks: Map<st
   }
 }
 
+function loadQueueFromStorage(): Plugin[] {
+  const raw = sessionStorage.getItem(QUEUE_STORAGE_KEY)
+  if (!raw) return []
+  try {
+    return JSON.parse(raw) as Plugin[]
+  } catch {
+    return []
+  }
+}
+
+function saveQueueToStorage(items: Plugin[]): void {
+  sessionStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(items))
+}
+
 export const usePackagerStore = defineStore("packager", () => {
   const persisted = loadFromStorage()
   const sessions = ref(persisted.sessions)
   const tasks = ref(persisted.tasks)
   const connectionError = ref<string | null>(null)
   const selectedArchitecture = ref<Architecture>("linux-amd64")
+  const queuedItems = ref<Plugin[]>(loadQueueFromStorage())
 
   const sseConnections = new Map<string, ReturnType<typeof useSSE>>()
 
@@ -261,6 +277,46 @@ export const usePackagerStore = defineStore("packager", () => {
     await submitPack(plugins)
   }
 
+  function enqueuePlugin(plugin: Plugin): void {
+    if (queuedItems.value.some((item) => item.plugin_id === plugin.plugin_id)) return
+    queuedItems.value.push(plugin)
+    saveQueueToStorage(queuedItems.value)
+  }
+
+  function removeFromQueue(pluginId: string): void {
+    const index = queuedItems.value.findIndex((item) => item.plugin_id === pluginId)
+    if (index === -1) return
+    queuedItems.value.splice(index, 1)
+    saveQueueToStorage(queuedItems.value)
+  }
+
+  function clearQueue(): void {
+    queuedItems.value = []
+    saveQueueToStorage(queuedItems.value)
+  }
+
+  function isInQueue(pluginId: string): boolean {
+    return queuedItems.value.some((item) => item.plugin_id === pluginId)
+  }
+
+  async function dequeueAndPack(architecture: Architecture): Promise<void> {
+    if (queuedItems.value.length === 0) return
+    const plugins: PackPluginItem[] = queuedItems.value.map((item) => ({
+      author: item.org,
+      name: item.name,
+      version: item.latest_version,
+      source: "marketplace" as const,
+      architecture,
+    }))
+    queuedItems.value = []
+    saveQueueToStorage(queuedItems.value)
+    await submitPack(plugins)
+  }
+
+  async function startPackFromQueue(architecture: Architecture): Promise<void> {
+    await dequeueAndPack(architecture)
+  }
+
   async function cancelPack(): Promise<void> {
     const activeSessions: string[] = []
     for (const session of sessions.value.values()) {
@@ -378,9 +434,16 @@ export const usePackagerStore = defineStore("packager", () => {
     hasTasks,
     connectionError,
     selectedArchitecture,
+    queuedItems,
     setArchitecture,
     loadSavedArchitecture,
     startPackFromCart,
+    startPackFromQueue,
+    enqueuePlugin,
+    dequeueAndPack,
+    removeFromQueue,
+    clearQueue,
+    isInQueue,
     appendPack,
     cancelPack,
     retryFailed,

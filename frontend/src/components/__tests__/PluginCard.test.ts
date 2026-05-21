@@ -1,8 +1,15 @@
-import { describe, it, expect, beforeEach } from "vitest"
+import { describe, it, expect, beforeEach, vi } from "vitest"
 import { mount } from "@vue/test-utils"
 import { createPinia, setActivePinia } from "pinia"
 import PluginCard from "@/components/PluginCard.vue"
 import type { Plugin } from "@/types/marketplace"
+
+vi.mock("@/stores/packager", () => ({
+  usePackagerStore: () => ({
+    isInQueue: () => false,
+    taskList: [],
+  }),
+}))
 
 function createMockPlugin(overrides: Partial<Plugin> = {}): Plugin {
   return {
@@ -32,6 +39,8 @@ function createMockPlugin(overrides: Partial<Plugin> = {}): Plugin {
 
 describe("PluginCard", () => {
   beforeEach(() => {
+    sessionStorage.clear()
+    localStorage.clear()
     setActivePinia(createPinia())
   })
 
@@ -89,55 +98,22 @@ describe("PluginCard", () => {
     expect(wrapper.text()).toContain("500")
   })
 
-  it("should show add button when plugin is not in cart", () => {
+  it("should show pack button by default", () => {
     const plugin = createMockPlugin()
     const wrapper = mount(PluginCard, { props: { plugin } })
-    const btn = wrapper.find("button")
+    const btn = wrapper.find("[data-testid='pack-trigger']")
     expect(btn.exists()).toBe(true)
-    expect(btn.text()).toBe("添加")
+    expect(btn.text()).toBe("打包")
     expect(btn.classes()).toContain("bg-blue-500")
     expect(btn.attributes("disabled")).toBeUndefined()
   })
 
-  it("should show disabled button when plugin is already in cart", async () => {
+  it("should emit pack event when pack button is clicked", async () => {
     const plugin = createMockPlugin()
     const wrapper = mount(PluginCard, { props: { plugin } })
-    const btn = wrapper.find("button")
+    const btn = wrapper.find("[data-testid='pack-trigger']")
     await btn.trigger("click")
-
-    const wrapper2 = mount(PluginCard, { props: { plugin } })
-    const btn2 = wrapper2.find("button")
-    expect(btn2.text()).toBe("已添加")
-    expect(btn2.classes()).toContain("bg-gray-300")
-    expect(btn2.attributes("disabled")).toBeDefined()
-  })
-
-  it("should add plugin to cart on button click", async () => {
-    const plugin = createMockPlugin()
-    const wrapper = mount(PluginCard, { props: { plugin } })
-    const btn = wrapper.find("button")
-    await btn.trigger("click")
-
-    const { useCartStore } = await import("@/stores/cart")
-    const cartStore = useCartStore()
-    expect(cartStore.hasItem(plugin.plugin_id)).toBe(true)
-  })
-
-  it("should restore add button after removing plugin from cart", async () => {
-    const plugin = createMockPlugin()
-    const wrapper = mount(PluginCard, { props: { plugin } })
-    const btn = wrapper.find("button")
-    await btn.trigger("click")
-
-    const { useCartStore } = await import("@/stores/cart")
-    const cartStore = useCartStore()
-    cartStore.removeItem(plugin.plugin_id)
-    await wrapper.vm.$nextTick()
-
-    const wrapper2 = mount(PluginCard, { props: { plugin } })
-    const btn2 = wrapper2.find("button")
-    expect(btn2.text()).toBe("添加")
-    expect(btn2.classes()).toContain("bg-blue-500")
-    expect(btn2.attributes("disabled")).toBeUndefined()
+    expect(wrapper.emitted("pack")).toBeTruthy()
+    expect(wrapper.emitted("pack")![0]).toEqual([plugin])
   })
 })

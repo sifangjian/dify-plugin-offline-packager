@@ -84,14 +84,14 @@
             </div>
           </div>
           <button
-            :disabled="cartStore.hasItem(plugin.plugin_id)"
-            :class="cartStore.hasItem(plugin.plugin_id)
+            :disabled="packagerStore.isInQueue(plugin.plugin_id)"
+            :class="packagerStore.isInQueue(plugin.plugin_id)
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : 'bg-blue-500 text-white hover:bg-blue-600'"
             class="px-4 py-2 text-sm rounded-lg transition-colors shrink-0"
-            @click="cartStore.addItem(plugin)"
+            @click="onPackClick"
           >
-            {{ cartStore.hasItem(plugin.plugin_id) ? '已添加' : '添加' }}
+            {{ packagerStore.isInQueue(plugin.plugin_id) ? '打包中' : '打包' }}
           </button>
         </div>
 
@@ -158,6 +158,12 @@
         </div>
       </div>
     </div>
+
+    <ArchitectureSelector
+      v-model="showArchSelector"
+      :selected-architecture="packagerStore.selectedArchitecture"
+      @confirm="onArchConfirm"
+    />
   </div>
 </template>
 
@@ -167,22 +173,37 @@ import { useRoute, useRouter } from "vue-router"
 import { marked } from "marked"
 import DOMPurify from "dompurify"
 import { getPluginDetail } from "@/api/marketplace"
-import { useCartStore } from "@/stores/cart"
+import { usePackagerStore } from "@/stores/packager"
+import ArchitectureSelector from "@/components/ArchitectureSelector.vue"
 import type { Plugin } from "@/types/marketplace"
+import type { Architecture } from "@/types/packager"
 
 const route = useRoute()
 const router = useRouter()
-const cartStore = useCartStore()
+const packagerStore = usePackagerStore()
 
 const plugin = ref<Plugin | null>(null)
 const isLoading = ref(true)
 const error = ref<string | null>(null)
+const showArchSelector = ref(false)
 
 const renderedIntroduction = computed(() => {
   if (!plugin.value?.introduction) return ""
   const rawHtml = marked.parse(plugin.value.introduction) as string
   return DOMPurify.sanitize(rawHtml)
 })
+
+function onPackClick() {
+  showArchSelector.value = true
+}
+
+function onArchConfirm(architecture: Architecture) {
+  showArchSelector.value = false
+  if (!plugin.value) return
+  packagerStore.setArchitecture(architecture)
+  packagerStore.enqueuePlugin(plugin.value)
+  packagerStore.dequeueAndPack(architecture)
+}
 
 function getI18nText(text: { zh_Hans: string; en_US: string }): string {
   return text.zh_Hans || text.en_US

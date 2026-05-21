@@ -47,13 +47,19 @@ function cancel(): void {
 </script>
 
 <template>
-  <div v-if="modelValue" data-testid="arch-selector">
+  <div
+    v-if="modelValue"
+    data-testid="arch-selector"
+  >
     <div
       data-testid="arch-overlay"
       class="fixed inset-0 z-50 bg-black/50"
     />
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" @click.stop>
+      <div
+        class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6"
+        @click.stop
+      >
         <h3 class="text-lg font-semibold text-gray-900 mb-4">
           选择目标架构
         </h3>

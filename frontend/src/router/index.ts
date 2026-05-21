@@ -5,23 +5,13 @@ const router = createRouter({
   routes: [
     {
       path: "/",
-      name: "search",
-      component: () => import("@/views/SearchView.vue"),
-    },
-    {
-      path: "/upload",
-      name: "upload",
-      component: () => import("@/views/UploadView.vue"),
+      name: "workspace",
+      component: () => import("@/views/WorkspaceView.vue"),
     },
     {
       path: "/plugin/:author/:name",
       name: "plugin-detail",
       component: () => import("@/views/PluginDetailView.vue"),
-    },
-    {
-      path: "/package",
-      name: "package",
-      component: () => import("@/views/PackageView.vue"),
     },
   ],
 })

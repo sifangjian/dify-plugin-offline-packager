@@ -10,6 +10,7 @@ describe("App.vue layout", () => {
 
   beforeEach(async () => {
     sessionStorage.clear()
+    localStorage.clear()
     setActivePinia(createPinia())
 
     router = createRouter({
@@ -17,13 +18,13 @@ describe("App.vue layout", () => {
       routes: [
         {
           path: "/",
-          name: "search",
-          component: { template: "<div data-testid='search-view'>SearchView</div>" },
+          name: "workspace",
+          component: { template: "<div data-testid='workspace-view'>WorkspaceView</div>" },
         },
         {
-          path: "/package",
-          name: "package",
-          component: { template: "<div data-testid='package-view'>PackageView</div>" },
+          path: "/plugin/:author/:name",
+          name: "plugin-detail",
+          component: { template: "<div data-testid='detail-view'>DetailView</div>" },
         },
       ],
     })
@@ -55,11 +56,11 @@ describe("App.vue layout", () => {
     expect(wrapper.text()).toContain("Dify Plugin Offline Packager")
   })
 
-  it("should contain CartSidebar placeholder", () => {
+  it("should not contain CartSidebar", () => {
     const wrapper = mount(App, {
       global: { plugins: [router] },
     })
     const sidebar = wrapper.find("[data-testid='cart-sidebar']")
-    expect(sidebar.exists()).toBe(true)
+    expect(sidebar.exists()).toBe(false)
   })
 })

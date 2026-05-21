@@ -142,7 +142,10 @@ watch(() => props.task.logs.length, () => {
       class="mt-3"
     >
       <div class="flex items-center">
-        <template v-for="(step, index) in STEP_ORDER" :key="step">
+        <template
+          v-for="(step, index) in STEP_ORDER"
+          :key="step"
+        >
           <div class="flex flex-col items-center">
             <div
               :class="[
@@ -155,11 +158,33 @@ watch(() => props.task.logs.length, () => {
                 }
               ]"
             >
-              <svg v-if="getStepState(index) === 'completed'" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              <svg
+                v-if="getStepState(index) === 'completed'"
+                class="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="3"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
-              <svg v-else-if="getStepState(index) === 'failed'" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              <svg
+                v-else-if="getStepState(index) === 'failed'"
+                class="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="3"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
               <span v-else>{{ index + 1 }}</span>
             </div>
