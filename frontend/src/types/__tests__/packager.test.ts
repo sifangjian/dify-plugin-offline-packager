@@ -93,6 +93,7 @@ describe("types/packager", () => {
         task_id: "t-1",
         plugin_name: "google",
         plugin_version: "1.0.0",
+        architecture: "linux-amd64",
       }
       if (event.event_type === "task_started") {
         expect(event.task_id).toBe("t-1")
@@ -171,6 +172,7 @@ describe("types/packager", () => {
         author: "langgenius",
         name: "google-search",
         version: "1.0.0",
+        architecture: "linux-amd64",
         status: "pending",
         currentStep: null,
         stepMessage: null,
@@ -198,6 +200,7 @@ describe("types/packager", () => {
         author: "langgenius",
         name: "google-search",
         version: "1.0.0",
+        architecture: "linux-amd64",
         status: "running",
         currentStep: "resolving_deps",
         stepMessage: "正在解析依赖...",
@@ -225,6 +228,7 @@ describe("types/packager", () => {
         author: "langgenius",
         name: "google-search",
         version: "1.0.0",
+        architecture: "linux-amd64",
         status: "failed",
         currentStep: null,
         stepMessage: null,

@@ -472,18 +472,28 @@ export const usePackagerStore = defineStore("packager", () => {
 
   async function enqueueUploadedPlugin(plugin: UploadResponse): Promise<void> {
     const fakePlugin: Plugin = {
+      type: "tool",
       plugin_id: `${plugin.author}/${plugin.name}`,
       name: plugin.name,
       org: plugin.author,
       latest_version: plugin.version,
       label: plugin.label,
-      description: plugin.description,
-      icon: "",
+      brief: plugin.label,
+      introduction: "",
+      readme_meta: { available_languages: [] },
       category: "",
       install_count: 0,
       created_at: "",
       updated_at: "",
-    } as Plugin
+      latest_package_identifier: "",
+      status: "active",
+      tags: [],
+      verification: null,
+      badges: [],
+      repository: null,
+      resource: null,
+      privacy_policy: "",
+    }
 
     if (queuedItems.value.some((item) => item.plugin_id === fakePlugin.plugin_id)) return
     queuedItems.value.push(fakePlugin)

@@ -31,6 +31,7 @@ export interface PackPluginItem {
   version: string
   source: "marketplace" | "local"
   architecture?: Architecture
+  upload_id?: string
 }
 
 export interface PackRequest {

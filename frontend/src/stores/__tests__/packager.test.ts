@@ -207,6 +207,7 @@ describe("usePackagerStore", () => {
         task_id: "task-1",
         plugin_name: "google-search",
         plugin_version: "1.0.0",
+        architecture: "linux-amd64",
       }
       store.handleSSEEvent(event)
 
@@ -310,6 +311,7 @@ describe("usePackagerStore", () => {
         task_id: "task-1",
         plugin_name: "google-search",
         plugin_version: "1.0.0",
+        architecture: "linux-amd64",
       })
 
       expect(store.isPacking).toBe(true)
@@ -454,6 +456,7 @@ describe("usePackagerStore", () => {
         task_id: "task-1",
         plugin_name: "n1",
         plugin_version: "1.0.0",
+        architecture: "linux-amd64",
       })
 
       await store.cancelPack()
