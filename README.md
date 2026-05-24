@@ -52,6 +52,28 @@ docker run -p 9090:9090 \
 4. **下载结果** — 打包完成后自动下载离线包，文件名格式为 `{name}-{version}-{architecture}-offline.difypkg`
 5. **上传本地插件** — 切换到「本地上传」标签页，拖拽或选择 `.difypkg` 文件上传后打包
 
+### 安装离线包
+
+1. 访问 Dify 平台的 **插件管理页面**
+2. 选择 **通过本地插件文件安装**
+3. 上传对应的 `*-linux-amd64.difypkg`（x86_64 服务器）或 `*-linux-arm64.difypkg`（ARM64 服务器）文件
+4. 完成安装后即可在应用中启用
+
+### Dify 平台配置（离线环境）
+
+在 `.env` 配置文件中添加/修改以下字段：
+
+```bash
+# 允许安装未在 Marketplace 审核的插件
+FORCE_VERIFYING_SIGNATURE=false
+
+# 允许安装 500M 以内的插件
+PLUGIN_MAX_PACKAGE_SIZE=524288000
+
+# Nginx 允许上传 500M 以内的内容
+NGINX_CLIENT_MAX_BODY_SIZE=500M
+```
+
 ## 配置
 
 通过环境变量或 `.env` 文件配置，所有配置项均有默认值，开箱即用。完整配置参见 [.env.example](.env.example)。
