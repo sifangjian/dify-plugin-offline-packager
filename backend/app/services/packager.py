@@ -19,6 +19,7 @@ import asyncio
 import contextlib
 import os
 import re
+import shutil
 import stat
 import sys
 import time
@@ -170,6 +171,7 @@ class PackagerService:
                 version=plugin.version,
                 source=plugin.source,
                 architecture=plugin.architecture,
+                upload_id=plugin.upload_id,
                 status=TaskStatus.PENDING,
                 created_at=now,
                 updated_at=now,
@@ -444,9 +446,10 @@ class PackagerService:
 
         本地插件跳过下载步骤，直接从已上传的文件开始处理：
         1. 创建任务目录结构
-        2. 解析插件依赖
-        3. 下载所有依赖包
-        4. 生成离线安装包
+        2. 从上传目录复制文件到 source 目录
+        3. 解析插件依赖
+        4. 下载所有依赖包
+        5. 生成离线安装包
 
         Args:
             task: 任务信息
@@ -457,6 +460,26 @@ class PackagerService:
         await self._storage.create_task_dirs(task.task_id)
         if self._is_task_cancelled(task):
             return
+
+        if not task.upload_id:
+            raise PackageStepError(
+                step=PackStep.DOWNLOADING,
+                message="本地插件缺少 upload_id",
+                raw_error="Missing upload_id for local plugin",
+            )
+
+        local_file = self._storage.get_upload_file(task.upload_id)
+        if not local_file:
+            raise PackageStepError(
+                step=PackStep.DOWNLOADING,
+                message="上传文件已过期，请重新上传",
+                raw_error=f"Upload file expired or not found: {task.upload_id}",
+            )
+
+        source_dir = self._storage.get_source_dir(task.task_id)
+        dest_file = source_dir / f"{task.author}-{task.name}_{task.version}.difypkg"
+        shutil.copy2(local_file, dest_file)
+
         await self._step_resolve_deps(task)
         if self._is_task_cancelled(task):
             return
@@ -681,7 +704,8 @@ class PackagerService:
         total_deps = 0
         if req_file.exists():
             total_deps = sum(
-                1 for line in req_file.read_text().splitlines()
+                1
+                for line in req_file.read_text().splitlines()
                 if line.strip() and not line.strip().startswith("#") and not line.strip().startswith("-")
             )
 
@@ -977,14 +1001,21 @@ class PackagerService:
             "pip",
             "download",
             "--prefer-binary",
-            "--timeout", "120",
-            "--retries", "3",
-            "--platform", platform,
+            "--timeout",
+            "120",
+            "--retries",
+            "3",
+            "--platform",
+            platform,
             "--only-binary=:all:",
-            "-r", req_file_path,
-            "-d", wheels_dir,
-            "--index-url", pip_mirror_url,
-            "--trusted-host", trusted_host,
+            "-r",
+            req_file_path,
+            "-d",
+            wheels_dir,
+            "--index-url",
+            pip_mirror_url,
+            "--trusted-host",
+            trusted_host,
         ]
 
     def _build_pip_download_cmd_no_platform(
@@ -1000,12 +1031,18 @@ class PackagerService:
             "pip",
             "download",
             "--prefer-binary",
-            "--timeout", "120",
-            "--retries", "3",
-            "-r", req_file_path,
-            "-d", wheels_dir,
-            "--index-url", pip_mirror_url,
-            "--trusted-host", trusted_host,
+            "--timeout",
+            "120",
+            "--retries",
+            "3",
+            "-r",
+            req_file_path,
+            "-d",
+            wheels_dir,
+            "--index-url",
+            pip_mirror_url,
+            "--trusted-host",
+            trusted_host,
         ]
 
     def _get_cli_path(self, task: PackTaskInfo) -> str:
@@ -1028,6 +1065,7 @@ class PackagerService:
         error_msg = stderr.decode()
         if "No matching distribution found for" in error_msg:
             import re
+
             match = re.search(r"No matching distribution found for (\S+)", error_msg)
             package_name = match.group(1) if match else "unknown"
             arch_label = architecture.value
@@ -1162,9 +1200,7 @@ class PackagerService:
         self._emit_event(
             SessionCompletedEvent(
                 session_id=session_id,
-                success_count=sum(
-                    1 for tid in session.task_ids if self._tasks[tid].status == TaskStatus.SUCCESS
-                ),
+                success_count=sum(1 for tid in session.task_ids if self._tasks[tid].status == TaskStatus.SUCCESS),
                 failed_count=sum(
                     1
                     for tid in session.task_ids

@@ -16,9 +16,13 @@ workspace/
 """
 
 import shutil
+import uuid
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import aiofiles
+
+from app.models.plugin import UploadedFileInfo
 
 
 class StorageService:
@@ -31,14 +35,17 @@ class StorageService:
         _work_dir: 工作目录根路径
     """
 
-    def __init__(self, work_dir: Path):
+    def __init__(self, work_dir: Path, upload_expire_hours: int = 24):
         """
         初始化存储服务
 
         Args:
             work_dir: 工作目录根路径，所有任务文件将存储在此目录下
+            upload_expire_hours: 上传文件过期时间（小时）
         """
         self._work_dir = work_dir.resolve()
+        self._upload_expire_hours = upload_expire_hours
+        self._uploads: dict[str, UploadedFileInfo] = {}
 
     async def create_task_dirs(self, task_id: str) -> Path:
         """
@@ -173,3 +180,110 @@ class StorageService:
         task_dir = self.get_task_dir(task_id)
         if task_dir.exists():
             shutil.rmtree(task_dir)
+
+    async def save_upload_file(self, content: bytes, filename: str) -> tuple[str, Path]:
+        """
+        保存上传的插件文件
+
+        Args:
+            content: 文件二进制内容
+            filename: 原始文件名
+
+        Returns:
+            tuple[str, Path]: (upload_id, 文件保存路径)
+        """
+        upload_id = str(uuid.uuid4())
+        upload_dir = self._work_dir / "uploads"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
+        safe_name = Path(filename).name
+        file_path = upload_dir / f"{upload_id}_{safe_name}"
+
+        async with aiofiles.open(file_path, "wb") as f:
+            await f.write(content)
+
+        now = datetime.now()
+        self._uploads[upload_id] = UploadedFileInfo(
+            upload_id=upload_id,
+            file_path=file_path,
+            author="",
+            name="",
+            version="",
+            created_at=now,
+            expires_at=now + timedelta(hours=self._upload_expire_hours),
+        )
+
+        return upload_id, file_path
+
+    def get_upload_file(self, upload_id: str) -> Path | None:
+        """
+        获取上传文件路径
+
+        检查文件是否存在且未过期。
+
+        Args:
+            upload_id: 上传ID
+
+        Returns:
+            Path | None: 文件路径，过期或不存在返回 None
+        """
+        info = self._uploads.get(upload_id)
+        if not info:
+            return None
+        if datetime.now() > info.expires_at:
+            return None
+        if not info.file_path.exists():
+            return None
+        return info.file_path
+
+    def get_upload_info(self, upload_id: str) -> UploadedFileInfo | None:
+        """
+        获取上传文件信息
+
+        Args:
+            upload_id: 上传ID
+
+        Returns:
+            UploadedFileInfo | None: 上传文件信息
+        """
+        return self._uploads.get(upload_id)
+
+    def update_upload_metadata(self, upload_id: str, author: str, name: str, version: str) -> None:
+        """
+        更新上传文件的元数据
+
+        Args:
+            upload_id: 上传ID
+            author: 插件作者
+            name: 插件名称
+            version: 插件版本
+        """
+        info = self._uploads.get(upload_id)
+        if info:
+            info.author = author
+            info.name = name
+            info.version = version
+
+    def remove_upload(self, upload_id: str) -> None:
+        """
+        删除上传文件
+
+        Args:
+            upload_id: 上传ID
+        """
+        info = self._uploads.pop(upload_id, None)
+        if info and info.file_path.exists():
+            info.file_path.unlink()
+
+    async def cleanup_expired_uploads(self) -> int:
+        """
+        清理所有过期的上传文件
+
+        Returns:
+            int: 清理的文件数量
+        """
+        now = datetime.now()
+        expired = [upload_id for upload_id, info in self._uploads.items() if now > info.expires_at]
+        for upload_id in expired:
+            self.remove_upload(upload_id)
+        return len(expired)

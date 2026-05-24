@@ -84,6 +84,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-multipart" },
+    { name = "pyyaml" },
     { name = "sse-starlette" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -105,6 +106,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pydantic-settings", specifier = ">=2.0" },
     { name = "python-multipart", specifier = ">=0.0.18" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "sse-starlette", specifier = ">=3.4.3" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34.0" },
 ]

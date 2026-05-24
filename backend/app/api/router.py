@@ -11,12 +11,13 @@ API 路由聚合模块
 
 from fastapi import APIRouter
 
-from app.api import marketplace, pack, sse
+from app.api import marketplace, pack, sse, upload
 
 api_router = APIRouter()
 api_router.include_router(marketplace.router)
 api_router.include_router(pack.router)
 api_router.include_router(sse.router)
+api_router.include_router(upload.router)
 
 
 @api_router.get("/api/v1/health")

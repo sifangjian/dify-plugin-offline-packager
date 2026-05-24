@@ -14,7 +14,43 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
+
+
+class I18nText(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    en_US: str = ""
+    zh_Hans: str = ""
+
+
+class PluginManifest(BaseModel):
+    version: str
+    author: str
+    name: str
+    label: I18nText = I18nText()
+    description: I18nText = I18nText()
+    type: str = "plugin"
+    icon: str = ""
+
+
+class UploadResponse(BaseModel):
+    upload_id: str
+    author: str
+    name: str
+    version: str
+    label: I18nText
+    description: I18nText
+
+
+class UploadError(BaseModel):
+    filename: str
+    error: str
+
+
+class BatchUploadResponse(BaseModel):
+    success: list[UploadResponse]
+    failed: list[UploadError]
 
 
 class Architecture(StrEnum):
@@ -91,6 +127,17 @@ class PackPluginItem(BaseModel):
     version: str
     source: PluginSource = PluginSource.MARKETPLACE
     architecture: Architecture = Architecture.LINUX_AMD64
+    upload_id: str | None = None
+
+
+class UploadedFileInfo(BaseModel):
+    upload_id: str
+    file_path: Path
+    author: str
+    name: str
+    version: str
+    created_at: datetime
+    expires_at: datetime
 
 
 class PackRequest(BaseModel):
@@ -191,6 +238,7 @@ class PackTaskInfo(BaseModel):
     version: str
     source: PluginSource
     architecture: Architecture = Architecture.LINUX_AMD64
+    upload_id: str | None = None
     local_file_path: Path | None = None
     status: TaskStatus = TaskStatus.PENDING
     current_step: PackStep | None = None

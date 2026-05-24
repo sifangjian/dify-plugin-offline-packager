@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8080
     MAX_UPLOAD_SIZE_MB: int = 500
+    UPLOAD_EXPIRE_HOURS: int = 24
     WORK_DIR: str = "/app/workspace"
     DIFY_PLUGIN_CLI_PATH: str = ""
     DIFY_PLUGIN_CLI_LINUX_AMD64: str = f"{_CLI_DIR}/dify-plugin-linux-amd64"

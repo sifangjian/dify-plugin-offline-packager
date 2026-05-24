@@ -1,7 +1,7 @@
 import { defineStore } from "pinia"
 import { ref, computed } from "vue"
 import { useSSE } from "@/composables/useSSE"
-import { startPack, cancelSession, getDownloadUrl } from "@/api/plugin"
+import { startPack, cancelSession, getDownloadUrl, uploadPlugins } from "@/api/plugin"
 import type {
   Architecture,
   PackPluginItem,
@@ -11,6 +11,7 @@ import type {
 } from "@/types/packager"
 import { ARCHITECTURE_OPTIONS } from "@/types/packager"
 import type { Plugin } from "@/types/marketplace"
+import type { UploadResponse, UploadError, BatchUploadResponse } from "@/types/upload"
 
 const PACKAGER_STORAGE_KEY = "dify-plugin-packager"
 const QUEUE_STORAGE_KEY = "dify-plugin-packager-queue"
@@ -67,6 +68,9 @@ export const usePackagerStore = defineStore("packager", () => {
   const connectionError = ref<string | null>(null)
   const selectedArchitecture = ref<Architecture>("linux-amd64")
   const queuedItems = ref<Plugin[]>(loadQueueFromStorage())
+  const uploadedPlugins = ref<UploadResponse[]>([])
+  const uploadErrors = ref<UploadError[]>([])
+  const isUploading = ref(false)
 
   const sseConnections = new Map<string, ReturnType<typeof useSSE>>()
 
@@ -360,6 +364,7 @@ export const usePackagerStore = defineStore("packager", () => {
       name: task.name,
       version: task.version,
       source: "marketplace",
+      architecture: task.architecture,
     }
 
     tasks.value.delete(taskId)
@@ -426,6 +431,77 @@ export const usePackagerStore = defineStore("packager", () => {
     }
   }
 
+  async function uploadLocalFiles(files: File[]): Promise<BatchUploadResponse> {
+    isUploading.value = true
+    uploadErrors.value = []
+    try {
+      const response = await uploadPlugins(files)
+      uploadedPlugins.value.push(...response.success)
+      uploadErrors.value = response.failed
+      return response
+    } catch (err) {
+      const apiError = err as { message?: string }
+      uploadErrors.value = files.map((f) => ({
+        filename: f.name,
+        error: apiError.message || "上传失败",
+      }))
+      return { success: [], failed: uploadErrors.value }
+    } finally {
+      isUploading.value = false
+    }
+  }
+
+  function removeUploadedPlugin(uploadId: string): void {
+    const index = uploadedPlugins.value.findIndex((p) => p.upload_id === uploadId)
+    if (index !== -1) {
+      uploadedPlugins.value.splice(index, 1)
+    }
+  }
+
+  function clearUploadErrors(): void {
+    uploadErrors.value = []
+  }
+
+  function isUploadedPluginInQueue(uploadId: string): boolean {
+    const plugin = uploadedPlugins.value.find((p) => p.upload_id === uploadId)
+    if (!plugin) return false
+    return queuedItems.value.some(
+      (item) => item.org === plugin.author && item.name === plugin.name,
+    )
+  }
+
+  async function enqueueUploadedPlugin(plugin: UploadResponse): Promise<void> {
+    const fakePlugin: Plugin = {
+      plugin_id: `${plugin.author}/${plugin.name}`,
+      name: plugin.name,
+      org: plugin.author,
+      latest_version: plugin.version,
+      label: plugin.label,
+      description: plugin.description,
+      icon: "",
+      category: "",
+      install_count: 0,
+      created_at: "",
+      updated_at: "",
+    } as Plugin
+
+    if (queuedItems.value.some((item) => item.plugin_id === fakePlugin.plugin_id)) return
+    queuedItems.value.push(fakePlugin)
+    saveQueueToStorage(queuedItems.value)
+  }
+
+  async function packUploadedPlugin(plugin: UploadResponse, architecture: Architecture): Promise<void> {
+    const packItem: PackPluginItem = {
+      author: plugin.author,
+      name: plugin.name,
+      version: plugin.version,
+      source: "local",
+      upload_id: plugin.upload_id,
+      architecture,
+    }
+    await submitPack([packItem])
+  }
+
   return {
     sessions,
     tasks,
@@ -452,5 +528,14 @@ export const usePackagerStore = defineStore("packager", () => {
     restoreSessions,
     clearCompleted,
     handleSSEEvent,
+    uploadedPlugins,
+    uploadErrors,
+    isUploading,
+    uploadLocalFiles,
+    removeUploadedPlugin,
+    clearUploadErrors,
+    isUploadedPluginInQueue,
+    enqueueUploadedPlugin,
+    packUploadedPlugin,
   }
 })
