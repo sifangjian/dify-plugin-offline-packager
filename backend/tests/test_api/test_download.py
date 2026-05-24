@@ -56,7 +56,7 @@ class TestDownloadEndpoint:
 
         response = client.get("/api/v1/plugins/download/t-1")
         assert response.status_code == 200
-        assert "agent-0.0.9-offline.difypkg" in response.headers.get("content-disposition", "")
+        assert "agent-0.0.9-linux-amd64-offline.difypkg" in response.headers.get("content-disposition", "")
 
     def test_nonexistent_task_returns_404(self, client, app):
         mock_packager = AsyncMock(spec=PackagerService)
@@ -110,4 +110,4 @@ class TestDownloadEndpoint:
         response = client.get("/api/v1/plugins/download/t-1")
         assert response.status_code == 200
         content_disposition = response.headers.get("content-disposition", "")
-        assert "agent-0.0.9-offline.difypkg" in content_disposition
+        assert "agent-0.0.9-linux-amd64-offline.difypkg" in content_disposition

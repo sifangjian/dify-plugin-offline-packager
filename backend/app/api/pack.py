@@ -154,7 +154,7 @@ async def download_plugin(
     if not task.result_file_path or not task.result_file_path.exists():
         raise PackageError("打包结果文件不存在", code="FILE_NOT_FOUND", status_code=404)
 
-    filename = f"{task.name}-{task.version}-offline.difypkg"
+    filename = f"{task.name}-{task.version}-{task.architecture.value}-offline.difypkg"
 
     def iterfile():
         """

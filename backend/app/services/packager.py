@@ -923,7 +923,7 @@ class PackagerService:
                 uv_config = '\n[tool.uv]\nno-index = true\nfind-links = ["./wheels"]\nprerelease = "allow"\n'
                 pyproject_file.write_text(content + uv_config)
 
-        output_path = output_dir / f"{task.name}-{task.version}-offline.difypkg"
+        output_path = output_dir / f"{task.name}-{task.version}-{task.architecture.value}-offline.difypkg"
 
         last_emit_time = 0.0
         throttle_interval = 0.2
