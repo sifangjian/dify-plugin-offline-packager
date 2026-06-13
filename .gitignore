@@ -29,6 +29,9 @@ htmlcov/
 # Ruff
 .ruff_cache/
 
+# claude
+.claude/
+
 # Environments
 .env
 .env.local
@@ -56,4 +59,3 @@ workspace/
 specs/
 docs/
 .trae/
-README.dev.md

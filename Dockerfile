@@ -35,9 +35,7 @@ WORKDIR /app/backend
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/v1/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8080}/api/v1/health')" || exit 1
 
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-ENTRYPOINT ["/entrypoint.sh"]
+# 使用 shell 形式以支持环境变量
+CMD /app/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}

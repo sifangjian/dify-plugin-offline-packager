@@ -1,0 +1,27 @@
+services:
+  dify-plugin-offline-packager:
+    build:
+      context: .
+    image: dify-plugin-offline-packager:latest
+    container_name: dify-plugin-offline-packager
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:${PORT:-8080}"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=${PORT:-8080}
+      - MARKETPLACE_API_URL=${MARKETPLACE_API_URL:-https://marketplace.dify.ai}
+      - PIP_MIRROR_URL=${PIP_MIRROR_URL:-https://mirrors.aliyun.com/pypi/simple}
+      - GITHUB_API_URL=${GITHUB_API_URL:-https://github.com}
+      - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-500}
+      - WORK_DIR=${WORK_DIR:-/app/workspace}
+    volumes:
+      - workspace-data:${WORK_DIR:-/app/workspace}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8080}/api/v1/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  workspace-data:

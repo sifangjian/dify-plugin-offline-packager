@@ -24,9 +24,26 @@
 
 ## 快速开始
 
+### 方式一：docker-compose（推荐）
+
+```bash
+# 复制配置文件
+cp .env.example .env
+
+# 根据需要修改配置（可选）
+# vim .env
+
+# 构建并启动
+docker-compose up -d
+```
+
+浏览器访问 `http://localhost:8080` 即可使用。
+
+### 方式二：docker run
+
 ```bash
 # 构建镜像
-docker build -f docker/Dockerfile -t dify-plugin-offline-packager .
+docker build -t dify-plugin-offline-packager .
 
 # 启动服务
 docker run -p 8080:8080 dify-plugin-offline-packager
