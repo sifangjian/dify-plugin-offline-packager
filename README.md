@@ -27,6 +27,10 @@
 ### 方式一：docker-compose（推荐）
 
 ```bash
+# 克隆仓库
+git clone git@github.com:sifangjian/dify-plugin-offline-packager.git
+cd dify-plugin-offline-packager/
+
 # 复制配置文件
 cp .env.example .env
 
@@ -42,6 +46,10 @@ docker-compose up -d
 ### 方式二：docker run
 
 ```bash
+# 克隆仓库
+git clone git@github.com:sifangjian/dify-plugin-offline-packager.git
+cd dify-plugin-offline-packager/
+
 # 构建镜像
 docker build -t dify-plugin-offline-packager .
 
@@ -54,6 +62,14 @@ docker run -p 8080:8080 dify-plugin-offline-packager
 自定义配置：
 
 ```bash
+# 克隆仓库
+git clone git@github.com:sifangjian/dify-plugin-offline-packager.git
+cd dify-plugin-offline-packager/
+
+# 构建镜像
+docker build -t dify-plugin-offline-packager .
+
+# 启动服务
 docker run -p 9090:9090 \
   -e PORT=9090 \
   -e PIP_MIRROR_URL=https://pypi.org/simple \
